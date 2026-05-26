@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build
+tsconfig.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Storage / uploads
+storage/
+
+# Excel / Word generated files
+*.xlsx
+*.xls
+*.docx
+
+# OS
+.DS_Store
+Thumbs.db
