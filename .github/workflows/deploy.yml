@@ -1,18 +1,18 @@
-name: Deploy Next.js to cPanel
+name: Build & Deploy to cPanel
 
 on:
   push:
     branches: [main]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -21,19 +21,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Build Next.js app
+      - name: Build
         run: npm run build
         env:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          AUTH_URL: ${{ secrets.AUTH_URL }}
-
-      - name: Bundle public and static into standalone
-        run: |
-          cp -r public .next/standalone/public
-          cp -r .next/static .next/standalone/.next/static
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
 
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -41,11 +33,11 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
           local-dir: .next/standalone/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
           protocol: ftp
           port: 21
-          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**
+            **/.env
