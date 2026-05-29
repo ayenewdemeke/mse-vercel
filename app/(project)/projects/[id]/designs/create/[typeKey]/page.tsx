@@ -7,9 +7,11 @@ import {
   createWingExternal,
   createAbutmentInternal,
   createWingInternal,
+  createPanelFace,
 } from '@/app/actions/design-inputs';
 import ExternalStabilityForm from './external-stability-form';
 import InternalStabilityForm from './internal-stability-form';
+import PanelFaceForm from './panel-face-form';
 
 export default async function DesignCreatePage({
   params,
@@ -73,6 +75,15 @@ export default async function DesignCreatePage({
         typeName={designType.name}
         action={createWingInternal}
         isWing
+      />
+    );
+  }
+  if (typeKey === 'panel_face_design') {
+    return (
+      <PanelFaceForm
+        projectId={id}
+        typeName={designType.name}
+        action={createPanelFace}
       />
     );
   }

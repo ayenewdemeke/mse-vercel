@@ -367,6 +367,62 @@ export async function getWingInternal(designId: string, projectId: string) {
   });
 }
 
+// ─── Panel Face Design ─────────────────────────────────────────────────────────
+
+function parsePanelFace(fd: FormData) {
+  return {
+    fc: parseFloat(fd.get('fc') as string),
+    fy: parseFloat(fd.get('fy') as string),
+    lPanel: parseFloat(fd.get('lPanel') as string),
+    hPanel: parseFloat(fd.get('hPanel') as string),
+    tPanel: parseFloat(fd.get('tPanel') as string),
+    ssr: parseFloat(fd.get('ssr') as string),
+    cCoverPos: parseFloat(fd.get('cCoverPos') as string),
+    cCoverNeg: parseFloat(fd.get('cCoverNeg') as string),
+    barNumVert: parseFloat(fd.get('barNumVert') as string),
+    spacingVert: parseFloat(fd.get('spacingVert') as string),
+    barNumHor: parseFloat(fd.get('barNumHor') as string),
+    spacingHor: parseFloat(fd.get('spacingHor') as string),
+    huStr: parseFloat(fd.get('huStr') as string),
+    huEe: parseFloat(fd.get('huEe') as string),
+  };
+}
+
+export async function createPanelFace(projectId: string, formData: FormData) {
+  const access = await requireMember(projectId);
+  if (!access) return { error: 'Forbidden' };
+  const designType = await db.designType.findUnique({ where: { key: 'panel_face_design' } });
+  if (!designType) return { error: 'Design type not found' };
+  const data = parsePanelFace(formData);
+  if (Object.values(data).some(isNaN)) return { error: 'All fields are required and must be numbers' };
+  const name = (formData.get('name') as string | null)?.trim() || null;
+  const design = await db.design.create({
+    data: { userId: access.userId, projectId, designTypeId: designType.id, name },
+  });
+  await db.panelFaceDesign.create({ data: { ...data, projectId, designId: design.id } });
+  redirect(`/projects/${projectId}/designs`);
+}
+
+export async function updatePanelFace(designId: string, projectId: string, formData: FormData) {
+  const access = await requireDesignOwnerOrProjectOwner(designId, projectId);
+  if (!access) return { error: 'Forbidden' };
+  const data = parsePanelFace(formData);
+  if (Object.values(data).some(isNaN)) return { error: 'All fields are required and must be numbers' };
+  const name = (formData.get('name') as string | null)?.trim() || null;
+  await db.design.update({ where: { id: designId }, data: { name } });
+  await db.panelFaceDesign.update({ where: { designId }, data });
+  redirect(`/projects/${projectId}/designs/${designId}`);
+}
+
+export async function getPanelFace(designId: string, projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return db.panelFaceDesign.findUnique({
+    where: { designId },
+    include: { design: { include: { creator: { select: { id: true, name: true } }, designType: true } } },
+  });
+}
+
 // ─── Generic get design with type-specific data ────────────────────────────────
 
 export async function getDesignWithData(designId: string, projectId: string) {
@@ -382,6 +438,7 @@ export async function getDesignWithData(designId: string, projectId: string) {
       wingExternalStability: true,
       abutmentInternalStability: true,
       wingInternalStability: true,
+      panelFaceDesign: true,
     },
   });
   if (!design || design.projectId !== projectId) return null;

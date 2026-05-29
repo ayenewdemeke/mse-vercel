@@ -7,10 +7,12 @@ import {
   updateWingExternal,
   updateAbutmentInternal,
   updateWingInternal,
+  updatePanelFace,
 } from '@/app/actions/design-inputs';
 import { getProject } from '@/app/actions/projects';
 import ExternalStabilityEditForm from './external-stability-edit-form';
 import InternalStabilityEditForm from './internal-stability-edit-form';
+import PanelFaceEditForm from './panel-face-edit-form';
 
 export default async function DesignEditPage({
   params,
@@ -78,6 +80,16 @@ export default async function DesignEditPage({
         projectId={id} designId={designId} typeName={design.designType.name}
         designName={designName} isWing action={updateWingInternal}
         data={design.wingInternalStability}
+      />
+    );
+  }
+
+  if (typeKey === 'panel_face_design' && design.panelFaceDesign) {
+    return (
+      <PanelFaceEditForm
+        projectId={id} designId={designId} typeName={design.designType.name}
+        designName={designName} action={updatePanelFace}
+        data={design.panelFaceDesign}
       />
     );
   }

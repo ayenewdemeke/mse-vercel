@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import DeleteDesignButton from '../delete-design-button';
 import ExternalStabilityView from './external-stability-view';
 import InternalStabilityView from './internal-stability-view';
+import PanelFaceView from './panel-face-view';
 
 export default async function DesignViewPage({
   params,
@@ -32,6 +33,7 @@ export default async function DesignViewPage({
   const isInternal =
     typeKey === 'abutment_internal_stability' ||
     typeKey === 'wing_internal_stability';
+  const isPanelFace = typeKey === 'panel_face_design';
 
   return (
     <div>
@@ -47,7 +49,7 @@ export default async function DesignViewPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(isExternal || isInternal) && (
+          {(isExternal || isInternal || isPanelFace) && (
             <Button asChild size="sm">
               <Link href={`/projects/${id}/designs/${designId}/analyze`}>Analyze</Link>
             </Button>
@@ -68,6 +70,12 @@ export default async function DesignViewPage({
           wingExternalLl={design.wingExternalStabilityLl ?? undefined}
           wingExternal={design.wingExternalStability ?? undefined}
         />
+      ) : isPanelFace ? (
+        design.panelFaceDesign ? (
+          <PanelFaceView d={design.panelFaceDesign} />
+        ) : (
+          <p className="text-slate-500">No data found.</p>
+        )
       ) : (
         <InternalStabilityView
           designType={typeKey}

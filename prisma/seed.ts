@@ -41,6 +41,11 @@ async function main() {
       key: 'wing_internal_stability',
       description: 'Check for internal stability of a wing.',
     },
+    {
+      name: 'Precast Panel Face Design',
+      key: 'panel_face_design',
+      description: 'Flexure, shear, and crack control check for precast panel face.',
+    },
   ];
 
   for (const dt of designTypes) {

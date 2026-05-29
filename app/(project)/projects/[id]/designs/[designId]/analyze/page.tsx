@@ -18,6 +18,7 @@ import {
   type InternalStabilityRow,
 } from '@/lib/calculations/internal-stability';
 import { InternalStabilityChart } from '@/components/charts/internal-stability-chart-client';
+import { analyzePanelFace, type PanelFaceResult } from '@/lib/calculations/panel-face';
 
 const N = (v: number, d = 4) => (isFinite(v) ? v.toFixed(d) : '—');
 
@@ -45,6 +46,12 @@ export default async function AnalyzePage({
   if (!design) notFound();
 
   const typeKey = design.designType.key;
+
+  if (typeKey === 'panel_face_design' && design.panelFaceDesign) {
+    const d = design.panelFaceDesign;
+    const r = analyzePanelFace({ ...d, tPanel: d.tPanel, ssr: d.ssr, cCoverPos: d.cCoverPos, cCoverNeg: d.cCoverNeg });
+    return <PanelFacePage result={r} typeName={design.designType.name} id={id} designId={designId} inputs={d} />;
+  }
 
   if (typeKey === 'abutment_internal_stability' && design.abutmentInternalStability) {
     const d = design.abutmentInternalStability;
@@ -313,6 +320,299 @@ function Td({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Internal Stability Page ───────────────────────────────────────────────────
+
+// ─── Panel Face Design Page ────────────────────────────────────────────────────
+
+function PanelFacePage({
+  result: r,
+  typeName,
+  id,
+  designId,
+  inputs,
+}: {
+  result: PanelFaceResult;
+  typeName: string;
+  id: string;
+  designId: string;
+  inputs: {
+    barNumVert: number; spacingVert: number;
+    barNumHor: number; spacingHor: number;
+    huStr: number; huEe: number;
+  };
+}) {
+  const MMin_pos_raw = Math.min(1.33 * r.MU_pos, 1.6 * 0.67 * r.Mcr);
+  const MMin_neg_raw = Math.min(1.33 * r.MU_neg, 1.6 * 0.67 * r.Mcr);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Button variant="ghost" size="sm" asChild className="mb-1 -ml-2">
+            <Link href={`/projects/${id}/designs/${designId}`}>← Back</Link>
+          </Button>
+          <h1 className="text-2xl font-semibold text-slate-800">Analysis — {typeName}</h1>
+        </div>
+      </div>
+
+      {/* 1. Factored Load on Panel */}
+      <SectionTitle>Factored Load on Panel</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>HU.Str.Panel (kip/ft)</Th>
+            <Th>HU.EE.Panel (kip/ft)</Th>
+            <Th>HU.Panel (kip/ft)</Th>
+            <Th>MU.Panel.+ve (kip·ft)</Th>
+            <Th>MU.Panel.-ve (kip·ft)</Th>
+            <Th>VU.Panel (kip)</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(inputs.huStr)}</Td>
+            <Td>{N(inputs.huEe)}</Td>
+            <Td>{N(r.HU_panel)}</Td>
+            <Td>{N(r.MU_pos)}</Td>
+            <Td>{N(r.MU_neg)}</Td>
+            <Td>{N(r.VU_panel)}</Td>
+          </tr>
+        </tbody>
+      </TableWrap>
+
+      {/* 2. Concrete Cracking Moment */}
+      <SectionTitle>Concrete Cracking Moment</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>fRupture (ksi)</Th>
+            <Th>SPanel (in³)</Th>
+            <Th>MCR (kip·ft)</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(r.fr)}</Td>
+            <Td>{N(r.St, 2)}</Td>
+            <Td>{N(r.Mcr)}</Td>
+          </tr>
+        </tbody>
+      </TableWrap>
+
+      {/* 3. Minimum Applied Moment & Factored Ultimate Moment */}
+      <SectionTitle>Minimum Applied Moment &amp; Factored Ultimate Moment</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>MMin.Pos (kip·ft)</Th>
+            <Th>MMin.Neg (kip·ft)</Th>
+            <Th>MU.Panel.+ve governing (kip·ft)</Th>
+            <Th>MU.Panel.-ve governing (kip·ft)</Th>
+            <Th>VU.Panel (kip)</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(MMin_pos_raw)}</Td>
+            <Td>{N(MMin_neg_raw)}</Td>
+            <Td>{N(r.MMin_pos)}</Td>
+            <Td>{N(r.MMin_neg)}</Td>
+            <Td>{N(r.VU_panel)}</Td>
+          </tr>
+        </tbody>
+      </TableWrap>
+
+      {/* 4. Horizontal Positive Flexural Capacity */}
+      <SectionTitle>Horizontal Positive Flexural Capacity</SectionTitle>
+      <FlexureTable
+        beta1={r.beta1} alpha1={r.alpha1}
+        C={r.C_HorPos} a={r.a_HorPos} et={r.et_HorPos} phi={r.phi_f_HorPos}
+        MN={r.MN_pos_Hor} phiMN={r.phiMN_pos_Hor} MU={r.MMin_pos}
+        check={r.check_HorPos_flex}
+        barNum={inputs.barNumHor} spacing={inputs.spacingHor}
+      />
+
+      {/* 5. Vertical Positive Flexural Capacity */}
+      <SectionTitle>Vertical Positive Flexural Capacity</SectionTitle>
+      <FlexureTable
+        beta1={r.beta1} alpha1={r.alpha1}
+        C={r.C_VertPos} a={r.a_VertPos} et={r.et_VertPos} phi={r.phi_f_VertPos}
+        MN={r.MN_pos_Vert} phiMN={r.phiMN_pos_Vert} MU={r.MMin_pos}
+        check={r.check_VertPos_flex}
+        barNum={inputs.barNumVert} spacing={inputs.spacingVert}
+      />
+
+      {/* 6. Horizontal Negative Flexural Capacity */}
+      <SectionTitle>Horizontal Negative Flexural Capacity</SectionTitle>
+      <FlexureTable
+        beta1={r.beta1} alpha1={r.alpha1}
+        C={r.C_HorNeg} a={r.a_HorNeg} et={r.et_HorNeg} phi={r.phi_f_HorNeg}
+        MN={r.MN_neg_Hor} phiMN={r.phiMN_neg_Hor} MU={r.MMin_neg}
+        check={r.check_HorNeg_flex}
+        barNum={inputs.barNumHor} spacing={inputs.spacingHor}
+      />
+
+      {/* 7. Vertical Negative Flexural Capacity */}
+      <SectionTitle>Vertical Negative Flexural Capacity</SectionTitle>
+      <FlexureTable
+        beta1={r.beta1} alpha1={r.alpha1}
+        C={r.C_VertNeg} a={r.a_VertNeg} et={r.et_VertNeg} phi={r.phi_f_VertNeg}
+        MN={r.MN_neg_Vert} phiMN={r.phiMN_neg_Vert} MU={r.MMin_neg}
+        check={r.check_VertNeg_flex}
+        barNum={inputs.barNumVert} spacing={inputs.spacingVert}
+      />
+
+      {/* 8. Service I: Crack Control — Horizontal */}
+      <SectionTitle>Service I: Service Crack Control — Horizontal Reinforcement</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>SB.Hor (in)</Th>
+            <Th>γEV.Str.I</Th>
+            <Th>a (in)</Th>
+            <Th>γe</Th>
+            <Th>fSS (ksi)</Th>
+            <Th>dC (in)</Th>
+            <Th>βS</Th>
+            <Th>sMax.Crack (in)</Th>
+            <Th>Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(inputs.spacingHor, 3)}</Td>
+            <Td>1.35</Td>
+            <Td>{N(r.a_HorPos)}</Td>
+            <Td>1.0</Td>
+            <Td>{N(r.fs_Hor)}</Td>
+            <Td>{N(r.dc_Hor)}</Td>
+            <Td>{N(r.Vs_Hor)}</Td>
+            <Td>{N(r.Smax_Hor)}</Td>
+            <td className="px-3 py-2"><PFCheck v={r.check_crack_Hor} /></td>
+          </tr>
+        </tbody>
+      </TableWrap>
+
+      {/* 9. Service I: Crack Control — Vertical */}
+      <SectionTitle>Service I: Service Crack Control — Vertical Reinforcement</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>SB.Vert (in)</Th>
+            <Th>γEV.Str.I</Th>
+            <Th>a (in)</Th>
+            <Th>γe</Th>
+            <Th>fSS (ksi)</Th>
+            <Th>dC (in)</Th>
+            <Th>βS</Th>
+            <Th>sMax.Crack (in)</Th>
+            <Th>Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(inputs.spacingVert, 3)}</Td>
+            <Td>1.35</Td>
+            <Td>{N(r.a_VertPos)}</Td>
+            <Td>1.0</Td>
+            <Td>{N(r.fs_Vert)}</Td>
+            <Td>{N(r.dc_Vert)}</Td>
+            <Td>{N(r.Vs_Vert)}</Td>
+            <Td>{N(r.Smax_Vert)}</Td>
+            <td className="px-3 py-2"><PFCheck v={r.check_crack_Vert} /></td>
+          </tr>
+        </tbody>
+      </TableWrap>
+
+      {/* 10. Strength I: Shear Capacity */}
+      <SectionTitle>Strength I: Shear Capacity</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>VU.Panel (kip)</Th>
+            <Th>φV</Th>
+            <Th>β</Th>
+            <Th>VN.1 (kip)</Th>
+            <Th>VN.2 (kip)</Th>
+            <Th>VN.Panel (kip)</Th>
+            <Th>φVN.Panel (kip)</Th>
+            <Th>φVN / VU</Th>
+            <Th>Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          <tr className="hover:bg-slate-50">
+            <Td>{N(r.VU_panel)}</Td>
+            <Td>0.9</Td>
+            <Td>2</Td>
+            <Td>{N(r.Vc)}</Td>
+            <Td>{N(r.Vc_max)}</Td>
+            <Td>{N(Math.min(r.Vc, r.Vc_max))}</Td>
+            <Td>{N(r.phiVc)}</Td>
+            <Td>{N(r.phiVc / r.VU_panel)}</Td>
+            <td className="px-3 py-2"><PFCheck v={r.check_shear} /></td>
+          </tr>
+        </tbody>
+      </TableWrap>
+    </div>
+  );
+}
+
+function FlexureTable({
+  beta1, alpha1, C, a, et, phi, MN, phiMN, MU, check, barNum, spacing,
+}: {
+  beta1: number; alpha1: number;
+  C: number; a: number; et: number; phi: number;
+  MN: number; phiMN: number; MU: number;
+  check: string; barNum: number; spacing: number;
+}) {
+  return (
+    <TableWrap>
+      <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+        <tr>
+          <Th>β1</Th>
+          <Th>α1</Th>
+          <Th>c (in)</Th>
+          <Th>a (in)</Th>
+          <Th>εt</Th>
+          <Th>φf</Th>
+          <Th>MN (kip·ft)</Th>
+          <Th>φMN (kip·ft)</Th>
+          <Th>MU.Panel (kip·ft)</Th>
+          <Th>φMN / MU</Th>
+          <Th>Check</Th>
+        </tr>
+      </thead>
+      <tbody className="divide-y text-sm">
+        <tr className="hover:bg-slate-50">
+          <Td>{N(beta1)}</Td>
+          <Td>{N(alpha1)}</Td>
+          <Td>{N(C)}</Td>
+          <Td>{N(a)}</Td>
+          <Td>{N(et, 5)}</Td>
+          <Td>{N(phi)}</Td>
+          <Td>{N(MN)}</Td>
+          <Td>{N(phiMN)}</Td>
+          <Td>{N(MU)}</Td>
+          <Td>{N(phiMN / MU, 3)}</Td>
+          <td className="px-3 py-2">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs ${check === 'Adequate' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+              # {barNum} @ {spacing} in — {check}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </TableWrap>
+  );
+}
+
+function PFCheck({ v }: { v: string }) {
+  const ok = v === 'Adequate';
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs ${ok ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+      {v}
+    </span>
+  );
+}
 
 function Check({ v }: { v: string }) {
   const ok = v === 'Adequate';

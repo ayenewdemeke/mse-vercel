@@ -49,6 +49,7 @@ model Project {
   wingExternalStabilities     WingExternalStability[]
   abutmentInternalStabilities AbutmentInternalStability[]
   wingInternalStabilities     WingInternalStability[]
+  panelFaceDesigns            PanelFaceDesign[]
 }
 
 // ─── Team ─────────────────────────────────────────────────────────────────────
@@ -126,6 +127,7 @@ model Design {
   wingExternalStability     WingExternalStability?
   abutmentInternalStability AbutmentInternalStability?
   wingInternalStability     WingInternalStability?
+  panelFaceDesign           PanelFaceDesign?
 }
 
 // ─── Abutment External Stability ──────────────────────────────────────────────
@@ -345,6 +347,41 @@ model WingInternalStability {
   minDesignHeight Float
   maxDesignHeight Float
   sV              Float
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
+}
+
+// ─── Precast Panel Face Design ────────────────────────────────────────────────
+
+model PanelFaceDesign {
+  id        String   @id @default(cuid())
+  projectId String
+  designId  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Material Properties
+  fc Float
+  fy Float
+
+  // Panel Geometry
+  lPanel    Float
+  hPanel    Float
+  tPanel    Float
+  ssr       Float
+  cCoverPos Float
+  cCoverNeg Float
+
+  // Reinforcement (bar number and spacing)
+  barNumVert  Float
+  spacingVert Float
+  barNumHor   Float
+  spacingHor  Float
+
+  // Loads from internal stability analysis
+  huStr Float
+  huEe  Float
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)

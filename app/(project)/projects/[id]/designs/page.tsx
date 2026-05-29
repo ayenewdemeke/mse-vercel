@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { getDesigns } from '@/app/actions/designs';
 import { getProject } from '@/app/actions/projects';
 import { format } from 'date-fns';
-import { Plus, LayoutGrid } from 'lucide-react';
+import { Plus, LayoutGrid, FileDown } from 'lucide-react';
 import DeleteDesignButton from './delete-design-button';
 
 export default async function DesignsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,12 +24,32 @@ export default async function DesignsPage({ params }: { params: Promise<{ id: st
           <h1 className="text-2xl font-semibold text-slate-800 mb-1">Designs</h1>
           <p className="text-slate-500 text-sm">MSE stability design calculations for this project.</p>
         </div>
-        <Button asChild size="sm">
-          <Link href={`/projects/${id}/designs/add`}>
-            <Plus className="h-4 w-4" />
-            Add Design
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {designs.length > 0 && (
+            <>
+              <a
+                href={`/api/projects/${id}/report?format=docx`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              >
+                <FileDown className="h-4 w-4" />
+                Word Report
+              </a>
+              <a
+                href={`/api/projects/${id}/report?format=pdf`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              >
+                <FileDown className="h-4 w-4" />
+                PDF Report
+              </a>
+            </>
+          )}
+          <Button asChild size="sm">
+            <Link href={`/projects/${id}/designs/add`}>
+              <Plus className="h-4 w-4" />
+              Add Design
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {designs.length === 0 ? (
