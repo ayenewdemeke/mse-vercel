@@ -17,13 +17,13 @@ export default async function ProfilePage() {
       <div className="space-y-6">
         {/* Account info */}
         <div className="rounded-xl border bg-card p-6">
-          <h2 className="text-base font-semibold text-slate-700 mb-5">Account Information</h2>
+          <h2 className="text-base font-semibold text-slate-700 mb-5">Account information</h2>
           <ProfileInfoForm user={user} />
         </div>
 
         {/* Password */}
         <div className="rounded-xl border bg-card p-6">
-          <h2 className="text-base font-semibold text-slate-700 mb-1">Change Password</h2>
+          <h2 className="text-base font-semibold text-slate-700 mb-1">Change password</h2>
           <p className="text-sm text-slate-400 mb-5">
             Leave blank if you don&apos;t want to change your password.
           </p>

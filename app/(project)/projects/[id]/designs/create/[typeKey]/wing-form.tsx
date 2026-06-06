@@ -57,7 +57,7 @@ export default function WingForm({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card title="Design Name">
+        <Card title="Design name">
           <div className="max-w-sm">
             <Label htmlFor="name" className="text-sm text-slate-600">Name (optional)</Label>
             <Input
@@ -175,11 +175,12 @@ export default function WingForm({
           </Grid>
         </Card>
 
-        <Card title="Design Heights and Spacing">
+        <Card title="Design heights, spacing and reinforcement length">
           <Grid cols={3}>
             <Field name="minDesignHeight" label="Min Height (ft)" data={data} />
             <Field name="maxDesignHeight" label="Max Height (ft)" data={data} />
             <Field name="sV" label="Sv (ft)" data={data} />
+            <Field name="minRl" label="Min RL (ft)" data={data} />
           </Grid>
         </Card>
 
@@ -188,7 +189,7 @@ export default function WingForm({
             <Link href={cancelHref}>Cancel</Link>
           </Button>
           <Button type="submit" disabled={isPending}>
-            {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Design'}
+            {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create design'}
           </Button>
         </div>
       </form>

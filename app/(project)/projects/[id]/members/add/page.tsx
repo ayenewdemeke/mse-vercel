@@ -61,7 +61,7 @@ export default function AddMemberPage() {
             <ArrowLeft className="h-4 w-4" />Back
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold text-slate-800">Add Member</h1>
+        <h1 className="text-2xl font-semibold text-slate-800">Add member</h1>
       </div>
 
       {error && (
@@ -112,7 +112,7 @@ export default function AddMemberPage() {
           </div>
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="role">Member Role <span className="text-red-500">*</span></Label>
+              <Label htmlFor="role">Member role <span className="text-red-500">*</span></Label>
               <select
                 id="role"
                 value={selectedRole}
@@ -133,7 +133,7 @@ export default function AddMemberPage() {
               </Button>
               <Button type="submit" disabled={isPending || !selectedRole}>
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Add Member
+                Add member
               </Button>
             </div>
           </form>

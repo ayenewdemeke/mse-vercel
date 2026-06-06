@@ -13,7 +13,7 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Sign In</Link>
+              <Link href="/login">Sign in</Link>
             </Button>
             <Button size="sm" asChild>
               <Link href="/register">Register</Link>

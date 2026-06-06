@@ -37,7 +37,7 @@ export default async function DesignsPage({ params }: { params: Promise<{ id: st
           <Button asChild size="sm">
             <Link href={`/projects/${id}/designs/add`}>
               <Plus className="h-4 w-4" />
-              Add Design
+              Add design
             </Link>
           </Button>
         </div>
@@ -49,7 +49,7 @@ export default async function DesignsPage({ params }: { params: Promise<{ id: st
           <p className="font-medium text-slate-700 mb-1">No designs yet</p>
           <p className="text-sm text-slate-500 mb-4">Create your first stability design calculation.</p>
           <Button asChild size="sm">
-            <Link href={`/projects/${id}/designs/add`}>Add Design</Link>
+            <Link href={`/projects/${id}/designs/add`}>Add design</Link>
           </Button>
         </div>
       ) : (
@@ -58,7 +58,7 @@ export default async function DesignsPage({ params }: { params: Promise<{ id: st
             <thead className="border-b bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left px-4 py-3">#</th>
-                <th className="text-left px-4 py-3">Design Type</th>
+                <th className="text-left px-4 py-3">Design type</th>
                 <th className="text-left px-4 py-3">Added by</th>
                 <th className="text-left px-4 py-3">Date</th>
                 <th className="px-4 py-3" />

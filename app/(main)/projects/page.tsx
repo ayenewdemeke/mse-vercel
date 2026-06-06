@@ -17,7 +17,7 @@ export default async function ProjectsPage() {
         <Button asChild>
           <Link href="/projects/create">
             <Plus className="h-4 w-4" />
-            New Project
+            New project
           </Link>
         </Button>
       </div>
@@ -28,7 +28,7 @@ export default async function ProjectsPage() {
           <p className="font-medium text-slate-700 mb-1">No projects yet</p>
           <p className="text-sm text-slate-500 mb-4">Create your first MSE design project to get started.</p>
           <Button asChild size="sm">
-            <Link href="/projects/create">Create Project</Link>
+            <Link href="/projects/create">Create project</Link>
           </Button>
         </div>
       ) : (
@@ -65,7 +65,7 @@ export default async function ProjectsPage() {
                   Added {format(new Date(project.createdAt), 'MMM d, yyyy')}
                 </p>
                 <Button asChild size="sm" className="w-full">
-                  <Link href={`/projects/${project.id}/dashboard`}>Open Project</Link>
+                  <Link href={`/projects/${project.id}/dashboard`}>Open project</Link>
                 </Button>
               </div>
             </div>

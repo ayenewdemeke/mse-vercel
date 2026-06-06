@@ -9,8 +9,8 @@ export type ProjectListItem = {
   id: string;
   name: string;
   location: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   description: string | null;
   image: string | null;
   createdAt: Date;
@@ -93,13 +93,14 @@ export async function createProject(formData: FormData) {
   const userId = session.user.id;
   const name = (formData.get('name') as string)?.trim();
   const location = (formData.get('location') as string)?.trim();
-  const latitude = parseFloat(formData.get('latitude') as string);
-  const longitude = parseFloat(formData.get('longitude') as string);
+  const latRaw = parseFloat(formData.get('latitude') as string);
+  const lonRaw = parseFloat(formData.get('longitude') as string);
+  const latitude = isNaN(latRaw) ? null : latRaw;
+  const longitude = isNaN(lonRaw) ? null : lonRaw;
   const description = (formData.get('description') as string)?.trim() || null;
   const imageFile = formData.get('image') as File | null;
 
   if (!name || !location) return { error: 'Name and location are required' };
-  if (isNaN(latitude) || isNaN(longitude)) return { error: 'Valid coordinates are required' };
 
   let imagePath: string | null = null;
   if (imageFile && imageFile.size > 0) {
@@ -134,13 +135,14 @@ export async function updateProject(id: string, formData: FormData) {
 
   const name = (formData.get('name') as string)?.trim();
   const location = (formData.get('location') as string)?.trim();
-  const latitude = parseFloat(formData.get('latitude') as string);
-  const longitude = parseFloat(formData.get('longitude') as string);
+  const latRaw = parseFloat(formData.get('latitude') as string);
+  const lonRaw = parseFloat(formData.get('longitude') as string);
+  const latitude = isNaN(latRaw) ? null : latRaw;
+  const longitude = isNaN(lonRaw) ? null : lonRaw;
   const description = (formData.get('description') as string)?.trim() || null;
   const imageFile = formData.get('image') as File | null;
 
   if (!name || !location) return { error: 'Name and location are required' };
-  if (isNaN(latitude) || isNaN(longitude)) return { error: 'Valid coordinates are required' };
 
   let imagePath = project.image;
   if (imageFile && imageFile.size > 0) {

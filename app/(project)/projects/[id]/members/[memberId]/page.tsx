@@ -73,7 +73,7 @@ export default function MemberDetailPage() {
             <ArrowLeft className="h-4 w-4" />Back
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold text-slate-800">Member Details</h1>
+        <h1 className="text-2xl font-semibold text-slate-800">Member details</h1>
       </div>
 
       {error && (
@@ -129,12 +129,12 @@ export default function MemberDetailPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-600">Change this member&apos;s role</p>
               <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>
-                Edit Role
+                Edit role
               </Button>
             </div>
           ) : (
             <form onSubmit={handleUpdateRole} className="space-y-4">
-              <h3 className="font-medium text-slate-800">Update Role</h3>
+              <h3 className="font-medium text-slate-800">Update role</h3>
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
@@ -172,7 +172,7 @@ export default function MemberDetailPage() {
                 className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                 onClick={() => setConfirmRemove(true)}
               >
-                Remove Member
+                Remove member
               </Button>
             </div>
           ) : (
@@ -192,7 +192,7 @@ export default function MemberDetailPage() {
                   onClick={handleRemove}
                 >
                   {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Confirm Remove
+                  Confirm remove
                 </Button>
               </div>
             </div>

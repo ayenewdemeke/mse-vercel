@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
   LayoutDashboard,
@@ -42,6 +42,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [userProjects, setUserProjects] = useState<ProjectListItem[]>([]);
 
   const userName = session?.user?.name || 'User';
+  const userImage = session?.user?.image ? `/api/storage/${session.user.image}` : null;
   const userInitials = userName
     .split(' ')
     .map((n: string) => n[0])
@@ -91,7 +92,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
             )}
           >
             <ArrowLeft className="h-4 w-4 flex-shrink-0" />
-            {!sidebarCollapsed && 'All Projects'}
+            {!sidebarCollapsed && 'All projects'}
           </Link>
         </div>
 
@@ -120,7 +121,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           {switcherOpen && !sidebarCollapsed && (
             <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-md border shadow-lg bg-white text-gray-900">
               <div className="p-2">
-                <p className="px-2 py-1 text-xs font-medium text-gray-500">Switch Project</p>
+                <p className="px-2 py-1 text-xs font-medium text-gray-500">Switch project</p>
                 {userProjects.map((p) => (
                   <Link
                     key={p.id}
@@ -189,11 +190,12 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         <div className="p-3">
           <div
             className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[hsl(var(--project-sidebar-muted))] transition-colors',
+              'flex items-center gap-3 px-3 py-2',
               sidebarCollapsed && 'justify-center px-0'
             )}
           >
             <Avatar className="h-8 w-8">
+              {userImage && <AvatarImage src={userImage} alt={userName} />}
               <AvatarFallback className="bg-[hsl(var(--project-sidebar-accent))] text-white text-xs">
                 {userInitials}
               </AvatarFallback>
@@ -225,10 +227,13 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
             </div>
 
             <div className="flex items-center gap-3 pl-3 border-l">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>{userInitials}</AvatarFallback>
-              </Avatar>
-              <span className="hidden xl:block text-sm font-medium">{userName}</span>
+              <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Avatar className="h-8 w-8">
+                  {userImage && <AvatarImage src={userImage} alt={userName} />}
+                  <AvatarFallback>{userInitials}</AvatarFallback>
+                </Avatar>
+                <span className="hidden xl:block text-sm font-medium">{userName}</span>
+              </Link>
               <Button
                 variant="ghost"
                 size="icon"

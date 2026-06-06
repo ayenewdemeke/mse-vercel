@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
   LayoutDashboard,
   FolderKanban,
-  User,
   HardHat,
   LogOut,
   Menu,
@@ -22,7 +21,6 @@ import { cn } from '@/lib/utils/cn';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Projects',  href: '/projects',  icon: FolderKanban },
-  { name: 'Profile',   href: '/profile',    icon: User },
 ];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +30,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const userName = session?.user?.name || 'User';
+  const userImage = session?.user?.image ? `/api/storage/${session.user.image}` : null;
   const userInitials = userName
     .split(' ')
     .map((n: string) => n[0])
@@ -129,13 +128,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* User area */}
         <div className="p-3">
-          <div
+          <Link
+            href="/profile"
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[hsl(var(--sidebar-muted))] transition-colors',
               sidebarCollapsed && 'justify-center px-0'
             )}
           >
             <Avatar className="h-8 w-8">
+              {userImage && <AvatarImage src={userImage} alt={userName} />}
               <AvatarFallback className="bg-[hsl(var(--sidebar-accent))] text-white text-xs">
                 {userInitials}
               </AvatarFallback>
@@ -150,7 +151,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </p>
               </div>
             )}
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -171,10 +172,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <div className="hidden lg:block" />
 
             <div className="flex items-center gap-3 pl-3 border-l">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>{userInitials}</AvatarFallback>
-              </Avatar>
-              <span className="hidden xl:block text-sm font-medium">{userName}</span>
+              <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Avatar className="h-8 w-8">
+                  {userImage && <AvatarImage src={userImage} alt={userName} />}
+                  <AvatarFallback>{userInitials}</AvatarFallback>
+                </Avatar>
+                <span className="hidden xl:block text-sm font-medium">{userName}</span>
+              </Link>
               <Button
                 variant="ghost"
                 size="icon"

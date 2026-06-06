@@ -38,13 +38,13 @@ export default function AddDesignPage() {
             <ArrowLeft className="h-4 w-4" />Back
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold text-slate-800">Add Design</h1>
+        <h1 className="text-2xl font-semibold text-slate-800">Add design</h1>
       </div>
 
       <div className="bg-card rounded-xl border p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1.5">
-            <Label htmlFor="type">Design Type <span className="text-red-500">*</span></Label>
+            <Label htmlFor="type">Design type <span className="text-red-500">*</span></Label>
             <select
               id="type"
               value={selectedKey}

@@ -32,8 +32,8 @@ model Project {
   userId      String
   name        String
   location    String
-  latitude    Float
-  longitude   Float
+  latitude    Float?
+  longitude   Float?
   description String?
   image       String?
   createdAt   DateTime @default(now())
@@ -186,6 +186,7 @@ model AbutmentDesign {
   minDesignHeight Float
   maxDesignHeight Float
   sV              Float
+  minRl           Float @default(8)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
@@ -256,6 +257,7 @@ model WingDesign {
   minDesignHeight Float
   maxDesignHeight Float
   sV              Float
+  minRl           Float @default(8)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)

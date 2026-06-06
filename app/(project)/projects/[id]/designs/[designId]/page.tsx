@@ -115,10 +115,11 @@ function AbutmentView({ d }: { d: Record<string, unknown> }) {
         <Row label="α.Ss" value={d.alphaSs} />
         <Row label="Sh" value={d.sh} />
       </Section>
-      <Section title="Design Heights and Spacing">
+      <Section title="Design heights, spacing and reinforcement length">
         <Row label="Min Height (ft)" value={d.minDesignHeight} />
         <Row label="Max Height (ft)" value={d.maxDesignHeight} />
         <Row label="Sv (ft)" value={d.sV} />
+        <Row label="Min RL (ft)" value={d.minRl} />
       </Section>
     </div>
   );
@@ -179,10 +180,11 @@ function WingView({ d }: { d: Record<string, unknown> }) {
         <Row label="D60" value={d.d60} />
         <Row label="D10" value={d.d10} />
       </Section>
-      <Section title="Design Heights and Spacing">
+      <Section title="Design heights, spacing and reinforcement length">
         <Row label="Min Height (ft)" value={d.minDesignHeight} />
         <Row label="Max Height (ft)" value={d.maxDesignHeight} />
         <Row label="Sv (ft)" value={d.sV} />
+        <Row label="Min RL (ft)" value={d.minRl} />
       </Section>
     </div>
   );

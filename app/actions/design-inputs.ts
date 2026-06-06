@@ -71,6 +71,7 @@ function parseAbutment(fd: FormData) {
     minDesignHeight: num(fd, 'minDesignHeight'),
     maxDesignHeight: num(fd, 'maxDesignHeight'),
     sV: num(fd, 'sV'),
+    minRl: num(fd, 'minRl'),
   };
 }
 
@@ -154,6 +155,7 @@ function parseWing(fd: FormData) {
     minDesignHeight: num(fd, 'minDesignHeight'),
     maxDesignHeight: num(fd, 'maxDesignHeight'),
     sV: num(fd, 'sV'),
+    minRl: num(fd, 'minRl'),
   };
 }
 

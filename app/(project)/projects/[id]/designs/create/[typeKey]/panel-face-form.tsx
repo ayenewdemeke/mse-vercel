@@ -57,7 +57,7 @@ export default function PanelFaceForm({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card title="Design Name">
+        <Card title="Design name">
           <div className="max-w-sm">
             <Label htmlFor="name" className="text-sm text-slate-600">Name (optional)</Label>
             <Input
@@ -133,7 +133,7 @@ export default function PanelFaceForm({
             <Link href={cancelHref}>Cancel</Link>
           </Button>
           <Button type="submit" disabled={isPending}>
-            {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Design'}
+            {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create design'}
           </Button>
         </div>
       </form>

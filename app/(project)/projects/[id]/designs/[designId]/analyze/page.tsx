@@ -4,7 +4,6 @@ import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileDown } from 'lucide-react';
-import { MinRlForm } from './min-rl-form';
 import { getDesignWithData } from '@/app/actions/design-inputs';
 import {
   analyzeAbutmentExternal,
@@ -32,15 +31,10 @@ function badgeClass(s: string) {
 
 export default async function AnalyzePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string; designId: string }>;
-  searchParams: Promise<{ minRl?: string }>;
 }) {
   const { id, designId } = await params;
-  const sp = await searchParams;
-  const minRl = parseFloat(sp.minRl ?? '8');
-  const safeMinRl = isNaN(minRl) ? 8 : minRl;
 
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
@@ -52,15 +46,14 @@ export default async function AnalyzePage({
 
   if (typeKey === 'abutment' && design.abutmentDesign) {
     const d = design.abutmentDesign;
-    const extRows = analyzeAbutmentExternal({ ...d, minRl: safeMinRl });
-    const intRows = analyzeAbutmentInternal({ ...d, minRl: safeMinRl });
+    const extRows = analyzeAbutmentExternal(d);
+    const intRows = analyzeAbutmentInternal(d);
     return (
       <AnalyzeShell
         id={id}
         designId={designId}
         typeName={design.designType.name}
         designName={design.name}
-        minRl={safeMinRl}
         showReportLinks
       >
         <Tabs defaultValue="external" className="w-full">
@@ -81,16 +74,15 @@ export default async function AnalyzePage({
 
   if (typeKey === 'wing' && design.wingDesign) {
     const d = design.wingDesign;
-    const extLlRows = analyzeWingExternalLl({ ...d, minRl: safeMinRl });
-    const extNoLlRows = analyzeWingExternalNoLl({ ...d, minRl: safeMinRl });
-    const intRows = analyzeWingInternal({ ...d, minRl: safeMinRl });
+    const extLlRows = analyzeWingExternalLl(d);
+    const extNoLlRows = analyzeWingExternalNoLl(d);
+    const intRows = analyzeWingInternal(d);
     return (
       <AnalyzeShell
         id={id}
         designId={designId}
         typeName={design.designType.name}
         designName={design.name}
-        minRl={safeMinRl}
         showReportLinks
       >
         <Tabs defaultValue="external-ll" className="w-full">
@@ -122,8 +114,7 @@ export default async function AnalyzePage({
         designId={designId}
         typeName={design.designType.name}
         designName={design.name}
-        minRl={safeMinRl}
-        showReportLinks={false}
+        showReportLinks
       >
         <PanelFaceResults result={r} inputs={d} />
       </AnalyzeShell>
@@ -140,7 +131,6 @@ function AnalyzeShell({
   designId,
   typeName,
   designName,
-  minRl,
   showReportLinks,
   children,
 }: {
@@ -148,7 +138,6 @@ function AnalyzeShell({
   designId: string;
   typeName: string;
   designName: string | null;
-  minRl: number;
   showReportLinks: boolean;
   children: React.ReactNode;
 }) {
@@ -164,16 +153,15 @@ function AnalyzeShell({
         </div>
         {showReportLinks && (
           <div className="flex items-center gap-3">
-            <MinRlForm defaultValue={minRl} />
             <a
-              href={`/api/projects/${id}/designs/${designId}/report?format=xlsx&minRl=${minRl}`}
+              href={`/api/projects/${id}/designs/${designId}/report?format=xlsx`}
               className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
               <FileDown className="h-4 w-4" />
               Excel
             </a>
             <a
-              href={`/api/projects/${id}/designs/${designId}/report?format=docx&minRl=${minRl}`}
+              href={`/api/projects/${id}/designs/${designId}/report?format=docx`}
               className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
               <FileDown className="h-4 w-4" />

@@ -206,8 +206,7 @@ export function analyzeAbutmentInternal(p: AbutmentInternalParams): InternalStab
     const psi = 45 + phiRFill * 0.5;
     const lAGs = Math.max((maxDh - z) * Math.tan(deg(90 - psi)), 0);
     const rlMinGeostrip = lEGeostrip + lAGs;
-    // PHP bug: no inner parens → (max / phiPoGs) * rcGs * 1000
-    const ltdsGeostrip = (Math.max(tMaxStrIGstrip, tMaxEeIGstrip) / phiPoGs * rcGs) * 1000;
+    const ltdsGeostrip = (Math.max(tMaxStrIGstrip, tMaxEeIGstrip) / (phiPoGs * rcGs)) * 1000;
     const poGeostripCheck = rlMinGeostrip < 0.7 * maxDh ? 'Adequate' : 'Inadequate';
 
     // Geosynthetic grid (same sHStrI/sHEeI as geostrip)
@@ -321,7 +320,7 @@ export function analyzeWingInternal(p: WingInternalParams): InternalStabilityRow
     const psi = 45 + phiRFill * 0.5;
     const lAGs = Math.max((maxDh - z) * Math.tan(deg(90 - psi)), 0);
     const rlMinGeostrip = lEGeostrip + lAGs;
-    const ltdsGeostrip = (Math.max(tMaxStrIGstrip, tMaxEeIGstrip) / phiPoGs * rcGs) * 1000;
+    const ltdsGeostrip = (Math.max(tMaxStrIGstrip, tMaxEeIGstrip) / (phiPoGs * rcGs)) * 1000;
     const poGeostripCheck = rlMinGeostrip < 0.7 * maxDh ? 'Adequate' : 'Inadequate';
 
     // Geosynthetic grid

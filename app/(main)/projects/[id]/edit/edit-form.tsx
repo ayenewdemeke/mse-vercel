@@ -12,8 +12,8 @@ type Project = {
   id: string;
   name: string;
   location: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   description: string | null;
   image: string | null;
 };
@@ -49,7 +49,7 @@ export default function EditProjectForm({ project }: { project: Project }) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Edit Project</h1>
+          <h1 className="text-2xl font-semibold text-slate-800">Edit project</h1>
         </div>
       </div>
 
@@ -60,9 +60,9 @@ export default function EditProjectForm({ project }: { project: Project }) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Data */}
+        {/* Basic data */}
         <div className="bg-card rounded-xl border p-6">
-          <h2 className="font-semibold text-slate-800 mb-4">Basic Data</h2>
+          <h2 className="font-semibold text-slate-800 mb-4">Basic data</h2>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
@@ -73,7 +73,7 @@ export default function EditProjectForm({ project }: { project: Project }) {
               <Input id="location" name="location" placeholder="e.g. I-25 Mile Marker 210" defaultValue={project.location} required disabled={isPending} />
             </div>
             <div className="space-y-1.5">
-              <Label>Project Image</Label>
+              <Label>Project image</Label>
               <input
                 type="file"
                 name="image"
@@ -92,31 +92,29 @@ export default function EditProjectForm({ project }: { project: Project }) {
 
         {/* Coordinates */}
         <div className="bg-card rounded-xl border p-6">
-          <h2 className="font-semibold text-slate-800 mb-4">Coordinates</h2>
+          <h2 className="font-semibold text-slate-800 mb-4">Coordinates <span className="text-xs font-normal text-slate-400">(optional)</span></h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="latitude">Latitude (°) <span className="text-red-500">*</span></Label>
+              <Label htmlFor="latitude">Latitude (°)</Label>
               <Input
                 id="latitude"
                 name="latitude"
                 type="number"
                 step="0.00000001"
                 placeholder="e.g. 38.855"
-                defaultValue={project.latitude}
-                required
+                defaultValue={project.latitude ?? undefined}
                 disabled={isPending}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="longitude">Longitude (°) <span className="text-red-500">*</span></Label>
+              <Label htmlFor="longitude">Longitude (°)</Label>
               <Input
                 id="longitude"
                 name="longitude"
                 type="number"
                 step="0.00000001"
                 placeholder="e.g. -104.921"
-                defaultValue={project.longitude}
-                required
+                defaultValue={project.longitude ?? undefined}
                 disabled={isPending}
               />
             </div>
@@ -142,7 +140,7 @@ export default function EditProjectForm({ project }: { project: Project }) {
           </Button>
           <Button type="submit" disabled={isPending}>
             {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save Changes
+            Save changes
           </Button>
         </div>
       </form>

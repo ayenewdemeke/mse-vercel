@@ -18,8 +18,6 @@ import {
   type ProjectReportData,
 } from '@/lib/reports/project-report';
 
-const DEFAULT_MIN_RL = 8;
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -27,9 +25,6 @@ export async function GET(
   const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
-
-  const minRl = parseFloat(req.nextUrl.searchParams.get('minRl') ?? String(DEFAULT_MIN_RL));
-  const safeMinRl = isNaN(minRl) ? DEFAULT_MIN_RL : minRl;
 
   // Auth check — must be project owner or member
   const project = await db.project.findUnique({
@@ -79,7 +74,7 @@ export async function GET(
         phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
         pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
         minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight,
-        sV: d.sV, minRl: safeMinRl,
+        sV: d.sV, minRl: d.minRl,
       };
       sections.push({
         kind: 'external',
@@ -95,7 +90,7 @@ export async function GET(
           'φF.soil (deg)': String(d.phiFSoil),
           'PGA': String(d.pga), 'F_PGA.EQ': String(d.fPgaEq), 'K_V': String(d.kV),
           'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
+          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(d.minRl),
         },
         rows: analyzeAbutmentExternal(extParams),
       });
@@ -115,9 +110,9 @@ export async function GET(
           't.st': String(d.tSt), 'St.Sg': String(d.stSg), 'φ/φo.Sg': String(d.phiPoSg), 'α.Sg': String(d.alphaSg), 'Rc.Sg': String(d.rcSg),
           'b.Ss': String(d.bSs), 'φ/φo.Ss': String(d.phiPoSs), 'f2': String(d.f2), 'α.Ss': String(d.alphaSs), 'Sh': String(d.sh),
           'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
+          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(d.minRl),
         },
-        rows: analyzeAbutmentInternal({ ...d, minRl: safeMinRl }),
+        rows: analyzeAbutmentInternal(d),
       });
     } else if (typeKey === 'wing' && design.wingDesign) {
       const d = design.wingDesign;
@@ -127,7 +122,7 @@ export async function GET(
         phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
         pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
         minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight,
-        sV: d.sV, minRl: safeMinRl,
+        sV: d.sV, minRl: d.minRl,
       };
       const wingExtParamsMap = {
         'YEV': String(d.yev), 'YLS.V': String(d.ylsV),
@@ -137,7 +132,7 @@ export async function GET(
         'φr.fill (deg)': String(d.phiRFill), 'φF.soil (deg)': String(d.phiFSoil),
         'PGA': String(d.pga), 'F_PGA.EQ': String(d.fPgaEq), 'K_V': String(d.kV),
         'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-        'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
+        'Sv (ft)': String(d.sV), 'Min RL (ft)': String(d.minRl),
       };
       sections.push({
         kind: 'external',
@@ -172,9 +167,9 @@ export async function GET(
           'b.Ss': String(d.bSs), 'φ/φo.Ss': String(d.phiPoSs), 'α.Ss': String(d.alphaSs), 'Sh': String(d.sh),
           'D60': String(d.d60), 'D10': String(d.d10),
           'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
+          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(d.minRl),
         },
-        rows: analyzeWingInternal({ ...d, minRl: safeMinRl }),
+        rows: analyzeWingInternal(d),
       });
     } else if (typeKey === 'panel_face' && design.panelFaceDesign) {
       const d = design.panelFaceDesign;

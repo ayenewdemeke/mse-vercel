@@ -724,9 +724,11 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
       indent?: number;
       color?: string;
       line?: number;
+      heading?: typeof HeadingLevel[keyof typeof HeadingLevel];
     } = {},
   ) =>
     new Paragraph({
+      heading: opts.heading,
       alignment: opts.align ?? AlignmentType.LEFT,
       indent: opts.indent ? { left: opts.indent } : undefined,
       spacing: { before: opts.before ?? 0, after: opts.after ?? 0, line: opts.line ?? 235 },
@@ -1420,11 +1422,12 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
 
   // Underlined section heading with a right-aligned AASHTO / FHWA reference,
   // matching the reference report's "Title …………… AASHTO X.Y" layout.
-  const headingRef = (title: string, ref = '', before = 360) =>
+  const headingRef = (title: string, ref = '', before = 360, level?: typeof HeadingLevel[keyof typeof HeadingLevel]) =>
     new Paragraph({
+      heading: level,
       spacing: { before, after: 80, line: lineSpacing },
       children: [
-        new TextRun({ text: title, bold: true, size: 22 }),
+        new TextRun({ text: title, bold: true, size: 22, color: '000000' }),
         ...(ref ? [new TextRun({ text: `   ${ref}`, size: 20, color: '4A5568' })] : []),
       ],
     });
@@ -1639,14 +1642,14 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
     opts: { title: string; isWing: boolean; chart: Buffer | null; sectionNum: number },
   ): DocChild[] => {
     const {
-      extVals, intVals, extChecks, intChecks, dhStr, hStr, rlStr,
+      numP, extVals, intVals, extChecks, intChecks, dhStr, hStr, rlStr,
       sVval, gammaSVal, phiSdeg, deltaSval, kaSval, sigmaBrgVal, phiFSoilVal,
       bIVal, thetaVal, pgaVal, fPgaEqVal, kVVal, kHVal, phiMoVal, extRows, intRows, intSample,
     } = ctx;
     const { title, isWing, chart, sectionNum } = opts;
     const wallWord = isWing ? 'wing' : 'abutment';
     let _sub = 0;
-    const secHead = (t: string, ref = '') => headingRef(`${sectionNum}.${++_sub} ${t}`, ref);
+    const secHead = (t: string, ref = '') => headingRef(`${sectionNum}.${++_sub} ${t}`, ref, 360, HeadingLevel.HEADING_2);
 
     // ── kAE / seismic intermediates computed from context params ─────────────
     const toRad = (d: number) => d * Math.PI / 180;
@@ -1659,6 +1662,16 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
       (Math.cos(toRad(deltaSval + bstemV + phiMoVal)) * Math.cos(toRad(bIVal - bstemV))),
     );
     const kAeVal = (kAeNumer / kAeDenomBase) * Math.pow(1 + Math.sqrt(kAeSqrtArg), -2);
+
+    // Wing uses Coulomb kA (analyzeWingInternal hardcodes theta=90)
+    const wingKaSqrtArg = Math.max(0,
+      (Math.sin(toRad(phiSdeg + deltaSval)) * Math.sin(toRad(phiSdeg - bIVal))) /
+      (Math.cos(toRad(deltaSval)) * Math.cos(toRad(bIVal))),
+    );
+    const wingGammaKa = Math.pow(1 + Math.sqrt(wingKaSqrtArg), 2);
+    const kaWingVal = Math.pow(Math.cos(toRad(phiSdeg)), 2) / (wingGammaKa * Math.cos(toRad(deltaSval)));
+    const kaVal = isWing ? kaWingVal : kaSval;
+
     const omIRn = dhStr.map((v) => kHVal * 0.5 * (gammaSVal / 1000) * Math.pow(parseFloat(v), 2));
     const omAEn = dhStr.map((v) => 0.5 * (gammaSVal / 1000) * Math.pow(parseFloat(v), 2) * kAeVal);
     const wEQ1n = omIRn.map((ir, i) => omAEn[i] + 0.5 * ir);
@@ -1695,10 +1708,10 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
 
     const out: DocChild[] = [
       blank(220),
-      p(title, { size: 24, bold: true, align: AlignmentType.CENTER, after: 260 }),
+      p(title, { size: 24, bold: true, align: AlignmentType.CENTER, after: 260, heading: HeadingLevel.HEADING_1 }),
 
       // ── A.1  Sequence of Calculations (ref page 4) ───────────────────────
-      page4Para([run('Sequence of Calculations', { bold: true })], { after: 160 }),
+      secHead('Sequence of Calculations'),
       page4Para([run('–  Geometry, Material Properties and Loads', { bold: true }), run(' Strength I, Service I, Extreme Event I')], { indent: 400 }),
       page4Para([run('–  External Stability: Bearing, Overturning, Sliding', { bold: true }), run(' Strength I, Extreme Event I')], { indent: 400 }),
       page4Para([run('–  Internal Stability: Steel Reinforcement: Tensile and Pullout', { bold: true }), run(' Strength I, Extreme Event I')], { indent: 400 }),
@@ -1746,7 +1759,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
         vr([calcLine([run('c'), sub('s'), run(' := 0 ', { italic: true }), blue('psf', { italic: true })])],
           'Cohesion. Geotech Report Table 4'),
         vr([calcLine([run(`θ := ${thetaVal.toFixed(0)} `, { italic: true }), blue('deg', { italic: true }), run(`          β := ${bIVal.toFixed(0)} `, { italic: true }), blue('deg', { italic: true })])], ''),
-        vr([activePressureEquation(kaSval)], 'Active Lateral Earth Pressure. FHWA 4-1'),
+        vr([activePressureEquation(kaVal)], 'Active Lateral Earth Pressure. FHWA 4-1'),
       ]),
 
       // ── A.4  Soil Properties: Foundation Soil (ref page 6) ───────────────
@@ -2005,7 +2018,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
       page4Para([run('Horizontal Pressure from Retained Fill', { bold: true })], { after: 80 }),
       vt([
         vr([matrixLine([run('σ'), sub('EH'), run(' := σ'), sub('EV'), run(' · k'), sub('A.S'), run(' = ')],
-          dhStr.map((v) => N((gammaSVal / 1000) * parseFloat(v) * kaSval, 3)), 'ksf')],
+          dhStr.map((v) => N((gammaSVal / 1000) * parseFloat(v) * kaVal, 3)), 'ksf')],
           'Horizontal Earth Pressure. AASHTO 11.10.5.2-1'),
         vr([matrixLine([run('P'), sub('EH'), run(' := 0.5 · γ'), sub('S'), run(' · k'), sub('A.S'), run(' · DH² = ')],
           extVals((r) => r.pEh, 3), 'kip/ft')], ''),
@@ -2052,7 +2065,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
       page4Para([run('Horizontal Pressure from LS', { bold: true })], { after: 80 }),
       vt([
         vr([matrixLine([run('σ'), sub('LS.H'), run(' := γ'), sub('S'), run(' · h'), sub('eq'), run(' · k'), sub('A.S'), run(' = ')],
-          extVals((r) => (gammaSVal / 1000) * r.hEq * kaSval, 3), 'ksf')],
+          extVals((r) => (gammaSVal / 1000) * r.hEq * kaVal, 3), 'ksf')],
           'Horizontal LS pressure and resultant load per linear foot along wall. AASHTO Figure 11.10.6.2.1-2'),
         vr([matrixLine([run('P'), sub('LS.H'), run(' := σ'), sub('LS.H'), run(' · DH = ')],
           extVals((r) => r.pLsH, 3), 'kip/ft')], ''),
@@ -2456,6 +2469,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
             run(' ft', { italic: true }),
           ],
         });
+        const gStripParamVal = isWing ? numP('G.strip', gStripVal) : gStripVal;
         const nNeedPara = new Paragraph({
           spacing: { before: 0, after: 90, line: lineSpacing },
           children: [new OfficeMath({ children: [
@@ -2480,7 +2494,13 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           children: [new OfficeMath({ children: [
             ms('γ', 'Strip'), new MathRun(' := '),
             new MathFraction({ numerator: [ms('n', 'Strip.Needed')], denominator: [ms('n', 'Strip.Actual')] }),
-            new MathRun(` = ${N(gStripVal, 3)}`),
+            new MathRun(` = ${N(gStripParamVal, 3)}`),
+          ] })],
+        });
+        const gStripWingPara = new Paragraph({
+          spacing: { before: 0, after: 140, line: lineSpacing },
+          children: [new OfficeMath({ children: [
+            ms('γ', 'Strip'), new MathRun(` := G.strip = ${N(gStripParamVal, 3)}`),
           ] })],
         });
         return [
@@ -2494,10 +2514,13 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
             ], 'Select which wall height to analyze. Reinforcement depths along wall, up to maximum. 8ft is highest'),
           ]),
           blank(80),
-          calcTwoColumn(
-            [nNeedPara, gStrPara],
-            [nActPara, noteP('DH extends above top of wall constructed. Amplify load on strips to account for additional load')],
-            80,
+          ...(isWing
+            ? [gStripWingPara]
+            : [calcTwoColumn(
+                [nNeedPara, gStrPara],
+                [nActPara, noteP('DH extends above top of wall constructed. Amplify load on strips to account for additional load')],
+                80,
+              )]
           ),
         ];
       })(),
@@ -2515,7 +2538,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
               'AASHTO Figure 11.10.6.3.2-2'),
             vr([calcLine([run('α'), sub('GeoStrip'), run(' := 0.6')])], 'AASHTO Table 11.10.6.3.2-1'),
             vr([calcLine([run('R'), sub('C.GeoStrip'), run(' := 0.8')])], 'AASHTO 11.10.6.4.1'),
-            vr([calcLine([run('k'), sub('R.GeoStrip'), run(` := 1.0 · k`), sub('A.S'), run(` = ${N(kaSval, 3)}`)])],
+            vr([calcLine([run('k'), sub('R.GeoStrip'), run(` := 1.0 · k`), sub('A.S'), run(` = ${N(kaVal, 3)}`)])],
               'Lateral Stress Coefficient. AASHTO Figure 11.10.6.2.1-3'),
           ]),
           blank(80),
@@ -2573,7 +2596,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           headingRef('Long Term Design Strength [LTDS]', 'AASHTO 11.10.6.4.1-1'),
           calcLine([run('LTDS'), sub('GeoStrip'), run(' := for i ∈ 0..2', { italic: true })]),
           calcLine([run('   L'), sub('i'), run(' ← max(T'), sub('Max.Str.I.GeoStrip'), run(', T'), sub('Max.EE.I.GeoStrip'), run(') / (φ'), sub('PO.GeoStrip'), run(' · R'), sub('C.GeoStrip'), run(')')], { after: 60 }),
-          matrixLine([run('   L = ')], intVals((r) => r.ltdsGeostrip, 1), 'lbf/in'),
+          matrixLine([run('   L = ')], intVals((r) => r.ltdsGeostrip, 1), 'lb/ft'),
           blank(140),
         ];
       })(),
@@ -2593,7 +2616,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
               'AASHTO Figure 11.10.6.3.2-2'),
             vr([calcLine([run('α'), sub('GeoGrid'), run(' := 0.8')])], 'AASHTO Table 11.10.6.3.2-1'),
             vr([calcLine([run('R'), sub('C.GeoGrid'), run(' := 0.8')])], 'Assumed coverage ratio'),
-            vr([calcLine([run('k'), sub('R.GeoGrid'), run(` := 1.0 · k`), sub('A.S'), run(` = ${N(kaSval, 3)}`)])],
+            vr([calcLine([run('k'), sub('R.GeoGrid'), run(` := 1.0 · k`), sub('A.S'), run(` = ${N(kaVal, 3)}`)])],
               'Lateral Stress Coefficient. AASHTO Figure 11.10.6.2.1-3'),
           ]),
           blank(80),
@@ -2650,7 +2673,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           headingRef('Long Term Design Strength [LTDS]', 'AASHTO 11.10.6.4.1-1'),
           calcLine([run('LTDS'), sub('GeoGrid'), run(' := for i ∈ 0..2', { italic: true })]),
           calcLine([run('   L'), sub('i'), run(' ← max(T'), sub('Max.Str.I.GeoGrid'), run(' / (φ'), sub('PO.GeoGrid'), run(' · R'), sub('C.GeoGrid'), run('), T'), sub('Max.EE.I.GeoGrid'), run(' / (φ'), sub('PO.GeoGrid.EE'), run(' · R'), sub('C.GeoGrid'), run(')')], { after: 60 }),
-          matrixLine([run('   L = ')], intVals((r) => r.ltdsGeogrid, 1), 'lbf/in'),
+          matrixLine([run('   L = ')], intVals((r) => r.ltdsGeogrid, 1), 'lb/ft'),
           blank(140),
         ];
       })(),
@@ -2738,7 +2761,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           headingRef('Long Term Design Strength [LTDS]', 'AASHTO 11.10.6.4.1-1'),
           calcLine([run('LTDS'), sub('SteelGrid'), run(' := for i ∈ 0..2', { italic: true })]),
           calcLine([run('   L'), sub('i'), run(' ← max(T'), sub('Max.Str.I.SteelGrid'), sub('i'), run(', T'), sub('Max.EE.I.SteelGrid'), sub('i'), run(') / (φ'), sub('PO.SteelGrid'), run(' · R'), sub('C.SteelGrid'), run(')')], { after: 60 }),
-          matrixLine([run('   L = ')], intVals((r) => r.ltdsSg, 1), 'lbf/in'),
+          matrixLine([run('   L = ')], intVals((r) => r.ltdsSg, 1), 'lb/ft'),
           blank(140),
         ];
       })(),
@@ -2747,6 +2770,9 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
       headingRef('Inextensible Reinforcement Parameters: Ribbed Metallic Strip', ''),
       ...(() => {
         const f1SsVal = N(Math.tan((phiSdeg * Math.PI) / 180), 3);
+        const d10Val = numP('D10', 0.01);
+        const d60Val = numP('D60', 0.1);
+        const f2WingVal = N((d10Val / d60Val) * Math.tan(toRad(phiSdeg)), 3);
         const rcSsVal = N(2 / 18, 3);
         const rlMaxSsVal = N(parseFloat(rlStr[rlStr.length - 1]), 3);
         return [
@@ -2758,7 +2784,9 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
               calcLine([run('φ'), sub('PO.SteelStrip'), run(' := 0.75'), run('          '), run('s'), sub('H'), run(' := 18 in')]),
             ], ''),
             vr([
-              calcLine([run('F'), sub('1'), run(` := tan(φ`), sub('S'), run(`) = ${f1SsVal}`), run('     '), run('F'), sub('2'), run(' := min(2, 1.2 + log(C'), sub('U.S'), run(')) = 2')]),
+              isWing
+                ? calcLine([run('F'), sub('1'), run(` := tan(φ`), sub('S'), run(`) = ${f1SsVal}`), run('     '), run('F'), sub('2'), run(' := (D'), sub('10'), run(' / D'), sub('60'), run(`) · tan(φ`), sub('S'), run(`) = ${f2WingVal}`)])
+                : calcLine([run('F'), sub('1'), run(` := tan(φ`), sub('S'), run(`) = ${f1SsVal}`), run('     '), run('F'), sub('2'), run(' := min(2, 1.2 + log(C'), sub('U.S'), run(')) = 2')]),
             ], ''),
             vr([
               calcLine([run("F'"), sub('SteelStrip'), run(' := for i ∈ 0..2', { italic: true })]),
@@ -2834,7 +2862,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           headingRef('Long Term Design Strength [LTDS]', 'AASHTO 11.10.6.4.1-1'),
           calcLine([run('LTDS'), sub('SteelStrip'), run(' := for i ∈ 0..2', { italic: true })]),
           calcLine([run('   L'), sub('i'), run(' ← max(T'), sub('Max.Str.I.SteelStrip'), sub('i'), run(', T'), sub('Max.EE.I.SteelStrip'), sub('i'), run(') / (φ'), sub('PO.SteelStrip'), run(' · R'), sub('C.SteelStrip'), run(')')], { after: 60 }),
-          matrixLine([run('   L = ')], intVals((r) => r.ltdsSs, 1), 'lbf/in'),
+          matrixLine([run('   L = ')], intVals((r) => r.ltdsSs, 1), 'lb/ft'),
           blank(140),
         ];
       })(),
@@ -2861,10 +2889,10 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           checkBox([run('Check'), sub('PO.SteelStrip'), run(' = ')], intChecks((r) => r.poSsCheck)),
         ],
         [
-          matrixLine([run('LTDS'), sub('GeoStrip'), run(' = ')], intVals((r) => r.ltdsGeostrip / 1000, 3), 'kip/in'),
-          matrixLine([run('LTDS'), sub('GeoGrid'), run(' = ')], intVals((r) => r.ltdsGeogrid / 1000, 3), 'kip/in'),
-          matrixLine([run('LTDS'), sub('SteelGrid'), run(' = ')], intVals((r) => r.ltdsSg / 1000, 3), 'kip/in'),
-          matrixLine([run('LTDS'), sub('SteelStrip'), run(' = ')], intVals((r) => r.ltdsSs / 1000, 3), 'kip/in'),
+          matrixLine([run('LTDS'), sub('GeoStrip'), run(' = ')], intVals((r) => r.ltdsGeostrip / 1000, 3), 'kip/ft'),
+          matrixLine([run('LTDS'), sub('GeoGrid'), run(' = ')], intVals((r) => r.ltdsGeogrid / 1000, 3), 'kip/ft'),
+          matrixLine([run('LTDS'), sub('SteelGrid'), run(' = ')], intVals((r) => r.ltdsSg / 1000, 3), 'kip/ft'),
+          matrixLine([run('LTDS'), sub('SteelStrip'), run(' = ')], intVals((r) => r.ltdsSs / 1000, 3), 'kip/ft'),
         ],
         0,
       ),
@@ -2893,7 +2921,7 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
           columnWidths: cw,
           borders: tblBorder,
           rows: [
-            new TableRow({ children: [hc('', 1), hc('Tal.reqd (lb/in)', 7)] }),
+            new TableRow({ children: [hc('', 1), hc('Tal.reqd (lb/ft)', 7)] }),
             new TableRow({ children: [hc('', 1), hc('Strength I', 3), hc('Extreme Event I', 4)] }),
             new TableRow({ tableHeader: true, children: [hc('Z (ft)'), hc('Geosynthetic'), hc('Metal Strip'), hc('Metal Grid'), hc('Geogrid'), hc('Geostrip'), hc('Metal Strip'), hc('Metal Grid')] }),
             ...intRows.map((r) => new TableRow({ children: [
@@ -2917,196 +2945,329 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
   // ════════════════════════════════════════════════════════════════════════
   // Precast Panel Facing — hand-calculation builder (mirrors ref pages 42-51)
   // ════════════════════════════════════════════════════════════════════════
-  const panelFacingChildren = (ds: PanelFaceDesignSection): DocChild[] => {
+  const panelFacingChildren = (ds: PanelFaceDesignSection, sectionNum: number): DocChild[] => {
     const r = ds.result;
     const inp = ds.inputs;
-    const p = ds.params;
+    const prms = ds.params;
     const numPp = (key: string, fb: number) => {
-      const v = parseFloat(p[key] ?? '');
+      const v = parseFloat(prms[key] ?? '');
       return isFinite(v) ? v : fb;
     };
-    const fcV = numPp("f'c (ksi)", 4.5);
-    const fyV = numPp('fy (ksi)', 60);
     const lPanelV = numPp('L panel (ft)', 10);
     const hPanelV = numPp('h panel (ft)', 5);
     const tPanelV = numPp('t panel (in)', 6);
     const ssrV = numPp('S sr (in)', 30);
+    const cCoverPosV = numPp('Cover +ve (in)', 2);
+    const cCoverNegV = numPp('Cover -ve (in)', 3);
     const ratioStr = (num: number, den: number, d = 3) =>
       isFinite(num / den) && !isNaN(num / den) ? (num / den).toFixed(d) : '—';
 
+    // Row/table helpers (same pattern as vr/vt in wallCalcChildren)
+    const lVr = (left: (Paragraph | Table)[], note: string): TableRow =>
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 5400, type: WidthType.DXA },
+            borders: noBorder,
+            margins: { top: 0, bottom: 60, left: 0, right: 160 },
+            children: left,
+          }),
+          new TableCell({
+            width: { size: 3960, type: WidthType.DXA },
+            borders: noBorder,
+            margins: { top: 0, bottom: 60, left: 160, right: 0 },
+            children: note
+              ? [noteP(note)]
+              : [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })],
+          }),
+        ],
+      });
+    const lVt = (rows: TableRow[]): Table =>
+      new Table({
+        width: { size: 9360, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        columnWidths: [5400, 3960],
+        borders: noBorder,
+        rows,
+      });
+    // Full-width row spanning both columns (used for check boxes)
+    const lVrFull = (children: (Paragraph | Table)[]): TableRow =>
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 9360, type: WidthType.DXA },
+            columnSpan: 2,
+            borders: noBorder,
+            margins: { top: 0, bottom: 60, left: 0, right: 0 },
+            children,
+          }),
+        ],
+      });
+
+    // Bar diameter as inline OfficeMath fraction + spacing param on same line
+    const barRow = (
+      dSub: string, barNum: number, sSub: string, spacing: number, note: string,
+    ): TableRow =>
+      lVr(
+        [
+          new Paragraph({
+            spacing: { before: 0, after: 90, line: lineSpacing },
+            children: [
+              new OfficeMath({
+                children: [
+                  ms('d', dSub),
+                  new MathRun(' := '),
+                  new MathFraction({
+                    numerator: [new MathRun(String(barNum))],
+                    denominator: [new MathRun('8')],
+                  }),
+                  new MathRun(' · in'),
+                ],
+              }),
+              run('          s'), sub(sSub), run(` := ${spacing} `), blue('in', { italic: true }),
+            ],
+          }),
+        ],
+        note,
+      );
+
+    let _sub = 0;
+    const panelSecHead = (t: string, ref = '') =>
+      headingRef(`${sectionNum}.${++_sub} ${t}`, ref, 360, HeadingLevel.HEADING_2);
+
     const flexBlock = (
-      headTitle: string,
-      ref: string,
-      C: number, a: number, et: number, phi: number, MN: number, phiMN: number,
-      MU: number, check: string, barText: string,
+      headTitle: string, ref: string,
+      abSub: string, dSub: string, flexCheckSub: string,
+      MNsub: string, MUsub: string,
+      C: number, a: number, et: number, phi: number,
+      MN: number, phiMN: number, MU: number,
+      check: string, barDesignation: string, directionText: string,
     ): DocChild[] => [
       headingRef(headTitle, ref),
-      calcTwoColumn(
-        [
-          calcLine([run('β'), sub('1'), run(` := ${N(r.beta1, 3)}          `), run('α'), sub('1'), run(` := ${N(r.alpha1, 3)}`)]),
-          calcLine([run('c := A'), sub('B'), run(' · f'), sub('Y.Steel'), run(' / (α'), sub('1'), run(" · f'"), sub('C.Con'), run(' · β'), sub('1'), run(' · s'), sub('SR'), run(`) = ${N(C, 3)} `), blue('in', { italic: true })]),
+      page4Para([run('Flexural Strength Parameters:', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
+          calcLine([run('β'), sub('1'), run(' := max(0.85 − 0.05·(f\''), sub('C.Con'), run(' − 4.0 ksi)/1 ksi, 0.65) = '), run(`${N(r.beta1, 3)}`)]),
+        ], 'Stress Block Factor. AASHTO 5.6.2.2'),
+        lVr([
+          calcLine([run('α1'), run(' := min(max(0.85 − 0.02·(f\''), sub('C.Con'), run(' − 10.0 ksi)/1 ksi, 0.75), 0.85) = '), run(`${N(r.alpha1, 3)}`)]),
+        ], ''),
+        lVr([
+          calcLine([run('c := A'), sub(abSub), run(' · f'), sub('Y.Steel'), run(' / (α'), sub('1'), run(' · f\''), sub('C.Con'), run(' · β'), sub('1'), run(' · s'), sub('SR'), run(`) = ${N(C, 3)} `), blue('in', { italic: true })]),
+        ], 'Concrete Stress Block. AASHTO 5.6.3.1.1-4'),
+        lVr([
           calcLine([run('a := β'), sub('1'), run(` · c = ${N(a, 3)} `), blue('in', { italic: true })]),
-          calcLine([run('ε'), sub('t'), run(` := ((d - c)/c) · 0.003 = ${N(et, 5)}`)]),
-          calcLine([run('φ'), sub('f'), run(` := ${N(phi, 3)}`)]),
-          calcLine([run('M'), sub('N'), run(' := A'), sub('B'), run(' · f'), sub('Y.Steel'), run(' · (d - a/2) = '), run(`${N(MN, 3)} `), blue('kip·ft', { italic: true })]),
-          calcLine([run('φM'), sub('N'), run(` := φ`), sub('f'), run(' · M'), sub('N'), run(` = ${N(phiMN, 3)} `), blue('kip·ft', { italic: true })]),
-          calcLine([run('M'), sub('U'), run(` := ${N(MU, 3)} `), blue('kip·ft', { italic: true }), run('          φM'), sub('N'), run('/M'), sub('U'), run(` = ${ratioStr(phiMN, MU)}`)]),
-          checkBox([run('Check'), sub('flex'), run(' = ')], [check]),
-        ],
-        [
-          noteP('Stress Block Factor. AASHTO 5.6.2.2'),
-          noteP('Concrete Stress Block. AASHTO 5.6.3.1.1-4'),
-          noteP('Effective Stress Block. AASHTO 5.6.3.2.2'),
-          noteP('Tension Controlled Check. AASHTO 5.5.4.2'),
-          noteP('Flexure Resistance Factor. AASHTO 5.5.4.2.1'),
-          noteP('Nominal / Factored Flexure Capacity. AASHTO 5.6.3.2.2-1'),
-          noteP(barText),
-        ],
-        0,
-      ),
+        ], 'Effective Stress Block. AASHTO 5.6.3.2.2'),
+      ]),
+      page4Para([run('Strength Reduction Factor', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
+          calcLine([run('ε'), sub('t'), run(' := (d'), sub(dSub), run(' − c) / c · 0.003 = '), run(`${N(et, 5)}`)]),
+        ], 'Tension Controlled Check. AASHTO 5.5.4.2'),
+        lVr([
+          calcLine([run('φ'), sub('f'), run(` := if ε`), sub('t'), run(` ≥ 0.005   = ${N(phi, 3)}`)]),
+          calcLine([run('           | return 0.9')]),
+          calcLine([run('           else')]),
+          calcLine([run('           | return max(0.75, 0.75 + (0.15·(ε'), sub('t'), run(' − 0.002)) / (0.005 − 0.002))')]),
+        ], 'Flexure Resistance Factor. AASHTO 5.5.4.2.1'),
+      ]),
+      page4Para([run('Factored Flexural Capacity', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
+          calcLine([run('M'), sub('N.' + MNsub), run(' := A'), sub(abSub), run(' · f'), sub('Y.Steel'), run(' · (d'), sub(dSub), run(' − a/2) = '), run(`${N(MN, 3)} `), blue('kip·ft', { italic: true })]),
+        ], 'Nominal Flexural Capacity. AASHTO 5.6.3.2.2-1'),
+        lVr([
+          calcLine([run('φ'), sub('f'), run(' · M'), sub('N.' + MNsub), run(' := φ'), sub('f'), run(' · M'), sub('N.' + MNsub), run(` = ${N(phiMN, 3)} `), blue('kip·ft', { italic: true })]),
+        ], 'Factored Flexure Capacity of wall stem per unit height'),
+        lVr([
+          calcLine([run('M'), sub('U.Panel.' + MUsub), run(` = ${N(MU, 3)} `), blue('kip·ft', { italic: true })]),
+        ], ''),
+        lVr([
+          calcLine([run('φ'), sub('f'), run(' · M'), sub('N.' + MNsub), run(' / M'), sub('U.Panel.' + MUsub), run(` = ${ratioStr(phiMN, MU)}`)]),
+        ], ''),
+        lVrFull([checkBox([run('Check'), sub(flexCheckSub), run(' = ')], [check])]),
+      ]),
+      page4Para([run(`${barDesignation} is ${check} for ${directionText}`, { bold: true })], { after: 120, align: AlignmentType.CENTER }),
       pageBreak(),
     ];
 
     const crackBlock = (
-      headTitle: string, sB: number, a: number, fs: number, dc: number, vs: number, smax: number, check: string,
+      headTitle: string,
+      sB: number, a: number, fs: number, dc: number, vs: number, smax: number,
+      check: string,
+      abSub: string, dPosSub: string, dNegSub: string,
     ): DocChild[] => [
       headingRef(headTitle, ''),
-      calcTwoColumn(
-        [
+      lVt([
+        lVr([
           calcLine([run('s'), sub('B'), run(` := ${N(sB, 1)} `), blue('in', { italic: true })]),
+        ], ''),
+        lVr([
           calcLine([run(`a := ${N(a, 3)} `), blue('in', { italic: true })]),
-          calcLine([run('γ'), sub('e'), run(' := 1.0          '), run('Exposure Factor for Class 1')]),
-          calcLine([run('f'), sub('SS'), run(' := min( 0.6·f'), sub('Y.Steel'), run(', M'), sub('U.Pos'), run('/(γ'), sub('EV.Str.I'), run('·A'), sub('B'), run('·(d - a/2)), … ) = '), run(`${N(fs, 3)} `), blue('ksi', { italic: true })]),
-          calcLine([run('d'), sub('C'), run(` := t`), sub('Panel'), run(' - d'), sub('Rebar.Neg'), run(` = ${N(dc, 3)} `), blue('in', { italic: true })]),
-          calcLine([run('β'), sub('S'), run(' := 1 + d'), sub('C'), run('/(0.7·(t'), sub('Panel'), run(' - d'), sub('C'), run(`)) = ${N(vs, 3)}`)]),
-          calcLine([run('s'), sub('Max.Crack'), run(' := max( 5 '), blue('in', { italic: true }), run(', 700·γ'), sub('e'), run('/(β'), sub('S'), run('·f'), sub('SS'), run(') - 2·d'), sub('C'), run(` ) = ${N(smax, 3)} `), blue('in', { italic: true })]),
-          checkBox([run('Check'), sub('Service.Cracking'), run(' = ')], [check]),
-        ],
-        [
-          noteP('Exposure Factor for Class 1'),
-          noteP('Max tensile stress in reinforcing steel.'),
-          noteP('CONSERVATIVE APPROACH'),
-          noteP('Distance from extreme tensile face to center of'),
-          noteP('reinforcement. Controlling case.'),
-          noteP('Max allowable rebar spacing. AASHTO 5.6.7-1'),
-        ],
-        0,
-      ),
+        ], ''),
+        lVr([
+          calcLine([run('γ'), sub('e'), run(' := 1.0')]),
+        ], 'Exposure Factor for Class 1'),
+        lVr([
+          calcLine([run('f'), sub('SS'), run(' := min(0.6·f'), sub('Y.Steel'), run(',   M'), sub('U.Panel.Pos'), run('/(γ'), sub('EV.Str.I'), run('·A'), sub(abSub), run('·(d'), sub(dPosSub), run(' − a/2)),')]),
+          calcLine([run('                    M'), sub('U.Panel.Neg'), run('/(γ'), sub('EV.Str.I'), run('·A'), sub(abSub), run('·(d'), sub(dNegSub), run(' − a/2)) )   = '), run(`${N(fs, 3)} `), blue('ksi', { italic: true })]),
+        ], 'Max tensile stress in reinforcing steel. CONSERVATIVE APPROACH'),
+        lVr([
+          calcLine([run('d'), sub('C'), run(' := t'), sub('Panel'), run(' − d'), sub(dNegSub), run(` = ${N(dc, 3)} `), blue('in', { italic: true })]),
+        ], 'Distance from extreme tensile face to center of reinforcement. Controlling case.'),
+        lVr([
+          calcLine([run('β'), sub('S'), run(' := 1 + d'), sub('C'), run(' / (0.7·(t'), sub('Panel'), run(' − d'), sub('C'), run(`)) = ${N(vs, 3)}`)]),
+        ], ''),
+        lVr([
+          calcLine([run('s'), sub('Max.Crack'), run(' := max(5 '), blue('in', { italic: true }), run(', 700·γ'), sub('e'), run(' / (β'), sub('S'), run('·f'), sub('SS'), run(') − 2·d'), sub('C'), run(` ) = ${N(smax, 3)} `), blue('in', { italic: true })]),
+        ], 'Max allowable rebar spacing. AASHTO 5.6.7-1'),
+        lVrFull([checkBox([run('Check'), sub('Service.Cracking'), run(' = ')], [check])]),
+      ]),
       pageBreak(),
     ];
 
     return [
       blank(220),
-      headingRef('Precast Panel Facing Design', ''),
+      headingRef(`${sectionNum}.   Precast Panel Facing Design`, '', 0, HeadingLevel.HEADING_1),
       calcP('Soil and Live Load Surcharge loads acting horizontally on Precast Panel Facing. Soil Reinforcement Strips act as supports.', { after: 40 }),
       calcP('Design for maximum positive moment between supports, and maximum negative moment at supports. Assume discrete reinforcement spaced 2.5ft horizontally and vertically.', { after: 160 }),
 
-      // ── Precast Panel Geometry (ref page 42) ──
-      headingRef('Precast Panel Geometry'),
-      calcTwoColumn(
-        [
+      // ── N.1 Panel Geometry and Reinforcement ──
+      panelSecHead('Panel Geometry and Reinforcement'),
+      lVt([
+        lVr([
           calcLine([run('L'), sub('Panel'), run(` := ${N(lPanelV, 0)} `), blue('ft', { italic: true }), run('          h'), sub('Panel'), run(` := ${N(hPanelV, 0)} `), blue('ft', { italic: true })]),
-          calcLine([run('s'), sub('SR'), run(` := ${N(ssrV, 0)} `), blue('in', { italic: true }), run('          t'), sub('Panel'), run(` := ${N(tPanelV, 0)} `), blue('in', { italic: true })]),
-        ],
-        [noteP('10ft by 5ft panels standard size. Use max allowable'), noteP('soil reinforcement spacing.'), noteP('6" nominal structural panel thickness.')],
-        160,
-      ),
-
-      // ── Panel Reinforcement (ref page 42) ──
-      headingRef('Panel Reinforcement'),
-      calcTwoColumn(
-        [
-          calcLine([run('d'), sub('B.Vert'), run(` := #${inp.barNumVert}/8 = ${N(r.dBarVert, 3)} `), blue('in', { italic: true }), run(`   @ ${N(inp.spacingVert, 0)}" o.c. vertically`)]),
-          calcLine([run('d'), sub('B.Hor'), run(` := #${inp.barNumHor}/8 = ${N(r.dBarHor, 3)} `), blue('in', { italic: true }), run(`   @ ${N(inp.spacingHor, 0)}" o.c. horizontally`)]),
-          calcLine([run('A'), sub('B.Vert'), run(` := (π/4)·d`), sub('B.Vert'), run('²·(1/s'), sub('Vert'), run(')·s'), sub('SR'), run(` = ${N(r.ABvert, 3)} `), blue('in²', { italic: true })]),
-          calcLine([run('A'), sub('B.Hor'), run(` := (π/4)·d`), sub('B.Hor'), run('²·(1/s'), sub('Hor'), run(')·s'), sub('SR'), run(` = ${N(r.ABhor, 3)} `), blue('in²', { italic: true })]),
-          calcLine([run('d'), sub('Rebar.Pos.Vert'), run(` = ${N(r.dB_pos_Vert, 3)} `), blue('in', { italic: true }), run('     d'), sub('Rebar.Pos.Hor'), run(` = ${N(r.dB_pos_Hor, 3)} `), blue('in', { italic: true })]),
-          calcLine([run('d'), sub('Rebar.Neg.Vert'), run(` = ${N(r.dB_neg_Vert, 3)} `), blue('in', { italic: true }), run('     d'), sub('Rebar.Neg.Hor'), run(` = ${N(r.dB_neg_Hor, 3)} `), blue('in', { italic: true })]),
-        ],
-        [
-          noteP(`#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}" placed vertically in panel`),
-          noteP(`#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}" placed horizontally in panel`),
-          noteP('Area of reinforcement per tributary face.'),
-          noteP('Depth to rebar from compression face.'),
-        ],
-        0,
-      ),
+        ], '10ft by 5ft panels standard size. Use max allowable soil reinforcement spacing. Use 6" nominal structural panel thickness.'),
+        lVr([calcLine([run('s'), sub('SR'), run(` := ${N(ssrV, 0)} `), blue('in', { italic: true })])], ''),
+        lVr([calcLine([run('t'), sub('Panel'), run(` := ${N(tPanelV, 0)} `), blue('in', { italic: true })])], ''),
+        lVr([calcLine([run('c'), sub('Cover.Pos'), run(` := ${N(cCoverPosV, 0)} `), blue('in', { italic: true })])], ''),
+        lVr([calcLine([run('c'), sub('Cover.Neg'), run(` := ${N(cCoverNegV, 0)} `), blue('in', { italic: true })])], ''),
+      ]),
+      blank(120),
+      lVt([
+        barRow('B.Vert', inp.barNumVert, 'B.Vert', inp.spacingVert, `#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}" placed vertically in panel`),
+        barRow('B.Hor', inp.barNumHor, 'B.Hor', inp.spacingHor, `#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}" placed horizontally in panel`),
+        lVr([
+          calcLine([run('A'), sub('B.Vert'), run(' := (π/4)·d'), sub('B.Vert'), run('²·(1/s'), sub('B.Vert'), run(')·s'), sub('SR'), run(` = ${N(r.ABvert, 3)} `), blue('in²', { italic: true })]),
+          calcLine([run('A'), sub('B.Hor'), run(' := (π/4)·d'), sub('B.Hor'), run('²·(1/s'), sub('B.Hor'), run(')·s'), sub('SR'), run(` = ${N(r.ABhor, 3)} `), blue('in²', { italic: true })]),
+        ], 'Area of reinforcement per tributary area.'),
+        lVr([
+          calcLine([run('d'), sub('Rebar.Pos.Vert'), run(' := t'), sub('Panel'), run(' − c'), sub('Cover.Pos'), run(' − 0.5·d'), sub('B.Vert'), run(` = ${N(r.dB_pos_Vert, 3)} `), blue('in', { italic: true })]),
+          calcLine([run('d'), sub('Rebar.Pos.Hor'), run(' := t'), sub('Panel'), run(' − c'), sub('Cover.Pos'), run(' − d'), sub('B.Vert'), run(' − 0.5·d'), sub('B.Hor'), run(` = ${N(r.dB_pos_Hor, 3)} `), blue('in', { italic: true })]),
+        ], 'Depth to rebar from compression face.'),
+        lVr([
+          calcLine([run('d'), sub('Rebar.Neg.Vert'), run(' := t'), sub('Panel'), run(' − d'), sub('Rebar.Pos.Vert'), run(` = ${N(r.dB_neg_Vert, 3)} `), blue('in', { italic: true })]),
+          calcLine([run('d'), sub('Rebar.Neg.Hor'), run(' := t'), sub('Panel'), run(' − d'), sub('Rebar.Pos.Hor'), run(` = ${N(r.dB_neg_Hor, 3)} `), blue('in', { italic: true })]),
+        ], ''),
+      ]),
       pageBreak(),
 
-      // ── Factored Load on Panel (ref page 43) ──
-      headingRef('Factored Load on Panel', 'AASHTO 11.10.6.2.1'),
-      calcTwoColumn(
-        [
-          calcLine([run('H'), sub('U.Str.Panel'), run(` := ${N(inp.huStr, 3)} `), blue('kip/ft', { italic: true })]),
-          calcLine([run('H'), sub('U.EE.Panel'), run(` := ${N(inp.huEe, 3)} `), blue('kip/ft', { italic: true })]),
-          calcLine([run('H'), sub('U.Panel'), run(' := max( H'), sub('U.Str.Panel'), run(' , H'), sub('U.EE.Panel'), run(` ) = ${N(r.HU_panel, 3)} `), blue('kip/ft', { italic: true })]),
-        ],
-        [noteP('Factored tensile load applied to the soil reinforcement'), noteP('connection at the wall face. Maximum TMax from internal'), noteP('stability, equal to LTDS for soil reinforcement.')],
-        140,
-      ),
+      // ── N.2 Factored Load on Panel ──
+      panelSecHead('Factored Load on Panel', 'AASHTO 11.10.6.2.1'),
+      calcP('Factored tensile load applied to the soil reinforcement connection at the wall face. Maximum TMax from internal stability, equal to LTDS for soil reinforcement.', { after: 100 }),
+      lVt([
+        lVr([
+          calcLine([run('H'), sub('U.Str.Panel'), run(' := for i ∈ 0..2', { italic: true })]),
+          calcLine([run('   H'), sub('i'), run(' ← max(T'), sub('Max.Str.I.SteelStrip,i'), run(', T'), sub('Max.Str.I.SteelGrid,i'), run(', T'), sub('Max.Str.I.GeoGrid,i'), run(', T'), sub('Max.Str.I.GeoStrip,i'), run(')')]),
+          calcLine([run('   H')]),
+          calcLine([run('H'), sub("U.Str.Panel'"), run(' := max(H'), sub('U.Str.Panel,0'), run(', H'), sub('U.Str.Panel,1'), run(', H'), sub('U.Str.Panel,2'), run(`) = ${N(inp.huStr, 3)} `), blue('kip/ft', { italic: true })]),
+        ], 'Factored tensile load per unit height'),
+        lVr([
+          calcLine([run('H'), sub('U.EE.Panel'), run(' := for i ∈ 0..2', { italic: true })]),
+          calcLine([run('   H'), sub('i'), run(' ← max(T'), sub('Max.EE.I.SteelStrip,i'), run(', T'), sub('Max.EE.I.SteelGrid,i'), run(', T'), sub('Max.EE.I.GeoGrid,i'), run(', T'), sub('Max.EE.I.GeoStrip,i'), run(')')]),
+          calcLine([run('   H')]),
+          calcLine([run('H'), sub("U.EE.Panel'"), run(' := max(H'), sub('U.EE.Panel,0'), run(', H'), sub('U.EE.Panel,1'), run(', H'), sub('U.EE.Panel,2'), run(`) = ${N(inp.huEe, 3)} `), blue('kip/ft', { italic: true })]),
+        ], ''),
+        lVr([
+          calcLine([run('H'), sub('U.Panel'), run(' := max(H'), sub("U.Str.Panel'"), run(', H'), sub("U.EE.Panel'"), run(`) = ${N(r.HU_panel, 3)} `), blue('kip/ft', { italic: true })]),
+        ], ''),
+      ]),
+      blank(120),
       page4Para([run('Factored Loads of Frame', { bold: true })], { after: 100 }),
-      calcTwoColumn(
-        [
-          calcLine([run('M'), sub('U.Panel.Pos'), run(' := max( H'), sub('U.Panel'), run('·s'), sub('SR'), run('²/8 , 0.08·H'), sub('U.Panel'), run('·s'), sub('SR'), run(`² ) = ${N(r.MU_pos, 3)} `), blue('kip·ft', { italic: true })]),
-          calcLine([run('M'), sub('U.Panel.Neg'), run(' := max( H'), sub('U.Panel'), run('·s'), sub('SR'), run('²/12 , 0.125·H'), sub('U.Panel'), run('·s'), sub('SR'), run(`² ) = ${N(r.MU_neg, 3)} `), blue('kip·ft', { italic: true })]),
+      lVt([
+        lVr([
+          calcLine([run('M'), sub('U.Panel.Pos'), run(' := max(H'), sub('U.Panel'), run('·s'), sub('SR'), run('²/8, 0.08·H'), sub('U.Panel'), run('·s'), sub('SR'), run(`² ) = ${N(r.MU_pos, 3)} `), blue('kip·ft', { italic: true })]),
+          calcLine([run('M'), sub('U.Panel.Neg'), run(' := max(H'), sub('U.Panel'), run('·s'), sub('SR'), run('²/12, 0.125·H'), sub('U.Panel'), run('·s'), sub('SR'), run(`² ) = ${N(r.MU_neg, 3)} `), blue('kip·ft', { italic: true })]),
           calcLine([run('V'), sub('U.Panel'), run(' := 0.625·H'), sub('U.Panel'), run('·s'), sub('SR'), run(` = ${N(r.VU_panel, 3)} `), blue('kip', { italic: true })]),
-        ],
-        [noteP('Positive moment between soil reinforcement and'), noteP('negative moment behind soil reinforcement.'), noteP('Use controlling case between single span, and'), noteP('continuous span conditions.')],
-        0,
-      ),
+        ], 'Positive moment between soil reinforcement and negative moment behind soil reinforcement. Use controlling case between single span and continuous span.'),
+      ]),
       pageBreak(),
 
-      // ── Concrete Cracking / Minimum / Ultimate Moment (ref page 44) ──
-      headingRef('Concrete Cracking Moment', 'AASHTO 5.4.2.6'),
-      calcTwoColumn(
-        [
+      // ── N.3 Concrete Cracking Moment ──
+      panelSecHead('Concrete Cracking Moment', 'AASHTO 5.4.2.6'),
+      lVt([
+        lVr([
           calcLine([run('f'), sub('Rupture'), run(" := 0.24·√(f'"), sub('C.Con'), run('/ksi)·ksi'), run(` = ${N(r.fr, 3)} `), blue('ksi', { italic: true })]),
+        ], 'Modulus of Rupture. AASHTO 5.4.2.6'),
+        lVr([
           calcLine([run('S'), sub('Panel'), run(' := s'), sub('SR'), run('·t'), sub('Panel'), run('²/6'), run(` = ${N(r.St, 1)} `), blue('in³', { italic: true })]),
+        ], 'Section Modulus'),
+        lVr([
           calcLine([run('M'), sub('CR'), run(' := f'), sub('Rupture'), run('·S'), sub('Panel'), run(` = ${N(r.Mcr, 3)} `), blue('kip·ft', { italic: true })]),
-        ],
-        [noteP('Modulus of Rupture. AASHTO 5.4.2.6'), noteP('Section Modulus'), noteP('Cracking Moment. AASHTO 5.6.3.3.2-1')],
-        140,
-      ),
-      headingRef('Minimum Applied Moment', 'AASHTO 5.6.3.3'),
-      calcLine([run('M'), sub('Min.Pos'), run(' := min( 1.33·M'), sub('U.Panel.Pos'), run(' , 1.6·0.67·M'), sub('CR'), run(` ) = ${N(Math.min(1.33 * r.MU_pos, 1.6 * 0.67 * r.Mcr), 3)} `), blue('kip·ft', { italic: true })], { after: 80 }),
-      calcLine([run('M'), sub('Min.Neg'), run(' := min( 1.33·M'), sub('U.Panel.Neg'), run(' , 1.6·0.67·M'), sub('CR'), run(` ) = ${N(Math.min(1.33 * r.MU_neg, 1.6 * 0.67 * r.Mcr), 3)} `), blue('kip·ft', { italic: true })], { after: 120 }),
+        ], 'Cracking Moment. AASHTO 5.6.3.3.2-1'),
+      ]),
+
+      // ── N.4 Governing Moment Demands ──
+      panelSecHead('Governing Moment Demands', 'AASHTO 5.6.3.3'),
+      page4Para([run('Minimum Applied Moment', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
+          calcLine([run('M'), sub('Min.Pos'), run(' := min(1.33·M'), sub('U.Panel.Pos'), run(', 1.6·0.67·M'), sub('CR'), run(` ) = ${N(Math.min(1.33 * r.MU_pos, 1.6 * 0.67 * r.Mcr), 3)} `), blue('kip·ft', { italic: true })]),
+        ], ''),
+        lVr([
+          calcLine([run('M'), sub('Min.Neg'), run(' := min(1.33·M'), sub('U.Panel.Neg'), run(', 1.6·0.67·M'), sub('CR'), run(` ) = ${N(Math.min(1.33 * r.MU_neg, 1.6 * 0.67 * r.Mcr), 3)} `), blue('kip·ft', { italic: true })]),
+        ], ''),
+      ]),
+      blank(80),
       page4Para([run('Factored Ultimate Moment', { bold: true })], { after: 100 }),
-      calcLine([run('M'), sub('U.Panel.Pos'), run(' := max( M'), sub('U.Panel.Pos'), run(' , M'), sub('Min.Pos'), run(` ) = ${N(r.MMin_pos, 3)} `), blue('kip·ft', { italic: true })], { after: 80 }),
-      calcLine([run('M'), sub('U.Panel.Neg'), run(' := max( M'), sub('U.Panel.Neg'), run(' , M'), sub('Min.Neg'), run(` ) = ${N(r.MMin_neg, 3)} `), blue('kip·ft', { italic: true })], { after: 80 }),
-      calcLine([run('V'), sub('U.Panel'), run(` := ${N(r.VU_panel, 3)} `), blue('kip', { italic: true })]),
+      lVt([
+        lVr([
+          calcLine([run('M'), sub('U.Panel.Pos'), run(' := max(M'), sub('U.Panel.Pos'), run(', M'), sub('Min.Pos'), run(` ) = ${N(r.MMin_pos, 3)} `), blue('kip·ft', { italic: true })]),
+          calcLine([run('M'), sub('U.Panel.Neg'), run(' := max(M'), sub('U.Panel.Neg'), run(', M'), sub('Min.Neg'), run(` ) = ${N(r.MMin_neg, 3)} `), blue('kip·ft', { italic: true })]),
+          calcLine([run('V'), sub('U.Panel'), run(` := ${N(r.VU_panel, 3)} `), blue('kip', { italic: true })]),
+        ], ''),
+      ]),
       pageBreak(),
 
-      // ── Flexural Capacity: 4 cases (ref pages 45-48) ──
-      ...flexBlock('Horizontal Positive Flexural Capacity:', 'AASHTO 5.6.3.2.2', r.C_HorPos, r.a_HorPos, r.et_HorPos, r.phi_f_HorPos, r.MN_pos_Hor, r.phiMN_pos_Hor, r.MMin_pos, r.check_HorPos_flex, `#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}" Horizontal Positive Flexure`),
-      ...flexBlock('Vertical Positive Flexural Capacity:', 'AASHTO 5.6.3.2.2', r.C_VertPos, r.a_VertPos, r.et_VertPos, r.phi_f_VertPos, r.MN_pos_Vert, r.phiMN_pos_Vert, r.MMin_pos, r.check_VertPos_flex, `#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}" Vertical Positive Flexure`),
-      ...flexBlock('Horizontal Negative Flexural Capacity:', 'AASHTO 5.6.3.2.2', r.C_HorNeg, r.a_HorNeg, r.et_HorNeg, r.phi_f_HorNeg, r.MN_neg_Hor, r.phiMN_neg_Hor, r.MMin_neg, r.check_HorNeg_flex, `#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}" Horizontal Negative Flexure`),
-      ...flexBlock('Vertical Negative Flexural Capacity:', 'AASHTO 5.6.3.2.2', r.C_VertNeg, r.a_VertNeg, r.et_VertNeg, r.phi_f_VertNeg, r.MN_neg_Vert, r.phiMN_neg_Vert, r.MMin_neg, r.check_VertNeg_flex, `#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}" Vertical Negative Flexure`),
+      // ── N.5 Flexural Capacity ──
+      panelSecHead('Flexural Capacity', 'AASHTO 5.6.3.2.2'),
+      ...flexBlock('Horizontal Positive Flexural Capacity:', 'AASHTO 5.6.3.2.2', 'B.Hor', 'Rebar.Pos.Hor', 'Flexure.Pos.Hor', 'Pos.Hor', 'Pos', r.C_HorPos, r.a_HorPos, r.et_HorPos, r.phi_f_HorPos, r.MN_pos_Hor, r.phiMN_pos_Hor, r.MMin_pos, r.check_HorPos_flex, `#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}"`, 'Horizontal Positive Flexure'),
+      ...flexBlock('Vertical Positive Flexural Capacity:', 'AASHTO 5.6.3.2.2', 'B.Vert', 'Rebar.Pos.Vert', 'Flexure.Pos.Vert', 'Pos.Vert', 'Pos', r.C_VertPos, r.a_VertPos, r.et_VertPos, r.phi_f_VertPos, r.MN_pos_Vert, r.phiMN_pos_Vert, r.MMin_pos, r.check_VertPos_flex, `#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}"`, 'Vertical Positive Flexure'),
+      ...flexBlock('Horizontal Negative Flexural Capacity:', 'AASHTO 5.6.3.2.2', 'B.Hor', 'Rebar.Neg.Hor', 'Flexure.Neg.Hor', 'Neg.Hor', 'Neg', r.C_HorNeg, r.a_HorNeg, r.et_HorNeg, r.phi_f_HorNeg, r.MN_neg_Hor, r.phiMN_neg_Hor, r.MMin_neg, r.check_HorNeg_flex, `#${inp.barNumHor} @ ${N(inp.spacingHor, 0)}"`, 'Horizontal Negative Flexure'),
+      ...flexBlock('Vertical Negative Flexural Capacity:', 'AASHTO 5.6.3.2.2', 'B.Vert', 'Rebar.Neg.Vert', 'Flexure.Neg.Vert', 'Neg.Vert', 'Neg', r.C_VertNeg, r.a_VertNeg, r.et_VertNeg, r.phi_f_VertNeg, r.MN_neg_Vert, r.phiMN_neg_Vert, r.MMin_neg, r.check_VertNeg_flex, `#${inp.barNumVert} @ ${N(inp.spacingVert, 0)}"`, 'Vertical Negative Flexure'),
 
-      // ── Service I Crack Control: Horizontal & Vertical (ref pages 49-50) ──
-      ...crackBlock('Service I: Service Crack Control: Horizontal Reinforcement', inp.spacingHor, r.a_HorPos, r.fs_Hor, r.dc_Hor, r.Vs_Hor, r.Smax_Hor, r.check_crack_Hor),
-      ...crackBlock('Service I: Service Crack Control: Vertical Reinforcement', inp.spacingVert, r.a_VertPos, r.fs_Vert, r.dc_Vert, r.Vs_Vert, r.Smax_Vert, r.check_crack_Vert),
+      // ── N.6 Crack Control ──
+      panelSecHead('Crack Control', 'AASHTO 5.6.7'),
+      ...crackBlock('Service I: Service Crack Control: Horizontal Reinforcement', inp.spacingHor, r.a_HorPos, r.fs_Hor, r.dc_Hor, r.Vs_Hor, r.Smax_Hor, r.check_crack_Hor, 'B.Hor', 'Rebar.Pos.Hor', 'Rebar.Neg.Hor'),
+      ...crackBlock('Service I: Service Crack Control: Vertical Reinforcement', inp.spacingVert, r.a_VertPos, r.fs_Vert, r.dc_Vert, r.Vs_Vert, r.Smax_Vert, r.check_crack_Vert, 'B.Vert', 'Rebar.Pos.Vert', 'Rebar.Neg.Vert'),
 
-      // ── Strength I: Shear Capacity (ref page 51) ──
-      headingRef('Strength I: Shear Capacity', ''),
-      calcTwoColumn(
-        [
+      // ── N.7 Shear Capacity ──
+      panelSecHead('Shear Capacity', 'AASHTO 5.7.3.4.1'),
+      page4Para([run('Shear Capacity Parameters:', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
           calcLine([run('V'), sub('U.Panel'), run(` := ${N(r.VU_panel, 3)} `), blue('kip', { italic: true })]),
-          calcLine([run('φ'), sub('V'), run(' := 0.9          '), run('β := 2')]),
-          calcLine([run('V'), sub('N.1'), run(" := 0.0316·β·√(f'"), sub('C.Con'), run('/ksi)·ksi·t'), sub('Panel'), run('·s'), sub('SR'), run(` = ${N(r.Vc, 3)} `), blue('kip', { italic: true })]),
-          calcLine([run('V'), sub('N.2'), run(" := 0.25·f'"), sub('C.Con'), run('·t'), sub('Panel'), run('·s'), sub('SR'), run(` = ${N(r.Vc_max, 3)} `), blue('kip', { italic: true })]),
-          calcLine([run('V'), sub('N.Panel'), run(' := min( V'), sub('N.1'), run(' , V'), sub('N.2'), run(` ) = ${N(Math.min(r.Vc, r.Vc_max), 3)} `), blue('kip', { italic: true })]),
+        ], 'Factored shear force at location of soil reinforcement connection. AASHTO 5.5.4.2.1 / 5.7.3.4.1'),
+        lVr([
+          calcLine([run('φ'), sub('V'), run(' := 0.9          β'), sub('S'), run(' := 2')]),
+        ], ''),
+      ]),
+      page4Para([run('Factored Shear Capacity:', { bold: true })], { after: 80 }),
+      lVt([
+        lVr([
+          calcLine([run('V'), sub('N.1'), run(' := 0.0316·β'), sub('S'), run('·√(f\''), sub('C.Con'), run('/ksi)·ksi·t'), sub('Panel'), run('·s'), sub('SR'), run(` = ${N(r.Vc, 3)} `), blue('kip', { italic: true })]),
+        ], 'AASHTO 5.7.3.3-3'),
+        lVr([
+          calcLine([run('V'), sub('N.2'), run(' := 0.25·f\''), sub('C.Con'), run('·t'), sub('Panel'), run('·s'), sub('SR'), run(` = ${N(r.Vc_max, 3)} `), blue('kip', { italic: true })]),
+        ], 'AASHTO 5.7.3.3-2'),
+        lVr([
+          calcLine([run('V'), sub('N.Panel'), run(' := min(V'), sub('N.1'), run(', V'), sub('N.2'), run(`) = ${N(Math.min(r.Vc, r.Vc_max), 3)} `), blue('kip', { italic: true })]),
+        ], 'Nominal / Factored Shear Capacity. AASHTO 5.7.3.3'),
+        lVr([
           calcLine([run('φV'), sub('N.Panel'), run(' := φ'), sub('V'), run('·V'), sub('N.Panel'), run(` = ${N(r.phiVc, 3)} `), blue('kip', { italic: true }), run('     φV'), sub('N.Panel'), run('/V'), sub('U.Panel'), run(` = ${ratioStr(r.phiVc, r.VU_panel)}`)]),
-          checkBox([run('Check'), sub('Shear.Panel'), run(' = ')], [r.check_shear]),
-        ],
-        [
-          noteP('Factored shear force at location of soil reinforcement'),
-          noteP('connection. AASHTO 5.5.4.2.1 / 5.7.3.4.1'),
-          noteP('AASHTO 5.7.3.3-3'),
-          noteP('AASHTO 5.7.3.3-2'),
-          noteP('Nominal / Factored Shear Capacity. AASHTO 5.7.3.3'),
-        ],
-        0,
-      ),
+        ], ''),
+        lVrFull([checkBox([run('Check'), sub('Shear.Panel'), run(' = ')], [r.check_shear])]),
+      ]),
     ];
   };
 
@@ -3147,8 +3308,9 @@ export async function generateProjectDocx(data: ProjectReportData): Promise<Buff
     );
   }
   if (panelDesign) {
+    ++docSecNum;
     docSections.push(
-      wallSection('Precast Panel Facing', panelFacingChildren(panelDesign)),
+      wallSection('Precast Panel Facing', panelFacingChildren(panelDesign, docSecNum)),
     );
   }
 

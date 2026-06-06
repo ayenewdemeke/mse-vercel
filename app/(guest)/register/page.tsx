@@ -49,7 +49,7 @@ export default function RegisterPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-slate-700">Full Name</Label>
+              <Label htmlFor="name" className="text-slate-700">Full name</Label>
               <Input
                 id="name"
                 name="name"
@@ -98,7 +98,7 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="confirmPassword" className="text-slate-700">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-slate-700">Confirm password</Label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                   Creating account...
                 </>
               ) : (
-                'Create Account'
+                'Create account'
               )}
             </button>
           </form>
@@ -130,7 +130,7 @@ export default function RegisterPage() {
         <p className="text-center text-sm text-slate-500 mt-6">
           Already have an account?{' '}
           <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-            Sign In
+            Sign in
           </Link>
         </p>
       </div>

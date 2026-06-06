@@ -19,14 +19,14 @@ export default async function MembersPage({ params }: { params: Promise<{ id: st
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800 mb-1">Team Members</h1>
+          <h1 className="text-2xl font-semibold text-slate-800 mb-1">Team members</h1>
           <p className="text-slate-500 text-sm">Manage who has access to this project.</p>
         </div>
         {isOwner && (
           <Button asChild size="sm">
             <Link href={`/projects/${id}/members/add`}>
               <Plus className="h-4 w-4" />
-              Add Member
+              Add member
             </Link>
           </Button>
         )}

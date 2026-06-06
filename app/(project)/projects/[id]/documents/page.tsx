@@ -60,7 +60,7 @@ export default function DocumentsPage() {
         <Button asChild size="sm">
           <Link href={`/projects/${id}/documents/add`}>
             <Plus className="h-4 w-4" />
-            Add Document
+            Add document
           </Link>
         </Button>
       </div>
@@ -77,7 +77,7 @@ export default function DocumentsPage() {
           <p className="font-medium text-slate-700 mb-1">No documents yet</p>
           <p className="text-sm text-slate-500 mb-4">Upload project files for your team.</p>
           <Button asChild size="sm">
-            <Link href={`/projects/${id}/documents/add`}>Upload Document</Link>
+            <Link href={`/projects/${id}/documents/add`}>Upload document</Link>
           </Button>
         </div>
       ) : (

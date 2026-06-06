@@ -33,7 +33,7 @@ export default function AddDocumentPage() {
             <ArrowLeft className="h-4 w-4" />Back
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold text-slate-800">Add Document</h1>
+        <h1 className="text-2xl font-semibold text-slate-800">Add document</h1>
       </div>
 
       {error && (
@@ -45,7 +45,7 @@ export default function AddDocumentPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-card rounded-xl border p-6 space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="name">Document Name <span className="text-red-500">*</span></Label>
+            <Label htmlFor="name">Document name <span className="text-red-500">*</span></Label>
             <Input
               id="name"
               name="name"
