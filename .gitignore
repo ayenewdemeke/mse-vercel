@@ -24,3 +24,8 @@ storage/
 # OS
 .DS_Store
 Thumbs.db
+
+# Design reference materials (not part of codebase)
+design-ref*/
+render-check/
+*.pdf
