@@ -44,12 +44,9 @@ model Project {
   documents Document[]
   designs   Design[]
 
-  abutmentExternalStabilities AbutmentExternalStability[]
-  wingExternalStabilityLls    WingExternalStabilityLl[]
-  wingExternalStabilities     WingExternalStability[]
-  abutmentInternalStabilities AbutmentInternalStability[]
-  wingInternalStabilities     WingInternalStability[]
-  panelFaceDesigns            PanelFaceDesign[]
+  abutmentDesigns  AbutmentDesign[]
+  wingDesigns      WingDesign[]
+  panelFaceDesigns PanelFaceDesign[]
 }
 
 // ─── Team ─────────────────────────────────────────────────────────────────────
@@ -122,53 +119,14 @@ model Design {
   project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   designType DesignType @relation(fields: [designTypeId], references: [id])
 
-  abutmentExternalStability AbutmentExternalStability?
-  wingExternalStabilityLl   WingExternalStabilityLl?
-  wingExternalStability     WingExternalStability?
-  abutmentInternalStability AbutmentInternalStability?
-  wingInternalStability     WingInternalStability?
-  panelFaceDesign           PanelFaceDesign?
+  abutmentDesign  AbutmentDesign?
+  wingDesign      WingDesign?
+  panelFaceDesign PanelFaceDesign?
 }
 
-// ─── Abutment External Stability ──────────────────────────────────────────────
+// ─── Abutment Design (external + internal merged) ─────────────────────────────
 
-model AbutmentExternalStability {
-  id        String   @id @default(cuid())
-  projectId String
-  designId  String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // LS Moment Arm
-  yev   Float
-  ylsV  Float
-
-  // Material Properties
-  bstemBatter Float
-  bI          Float
-  sigmaBrg    Float
-  deltaS      Float
-  gRFill      Float
-  phiRFill    Float
-  phiFSoil    Float
-
-  // EQ Parameters
-  pga    Float
-  fPgaEq Float
-  kV     Float
-
-  // Design Height and Spacing
-  minDesignHeight Float
-  maxDesignHeight Float
-  sV              Float
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
-}
-
-// ─── Wing External Stability (with Live Load) ─────────────────────────────────
-
-model WingExternalStabilityLl {
+model AbutmentDesign {
   id        String   @id @default(cuid())
   projectId String
   designId  String   @unique
@@ -179,93 +137,29 @@ model WingExternalStabilityLl {
   yev  Float
   ylsV Float
 
-  // Material Properties
-  bstemBatter Float
-  theta       Float
-  bI          Float
-  sigmaBrg    Float
-  deltaS      Float
-  gRFill      Float
-  phiRFill    Float
-  phiFSoil    Float
-
-  // EQ Parameters
-  pga    Float
-  fPgaEq Float
-  kV     Float
-
-  // Design Height and Spacing
-  minDesignHeight Float
-  maxDesignHeight Float
-  sV              Float
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
-}
-
-// ─── Wing External Stability (without Live Load) ──────────────────────────────
-
-model WingExternalStability {
-  id        String   @id @default(cuid())
-  projectId String
-  designId  String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // LS Moment Arm
-  yev  Float
-  ylsV Float
-
-  // Material Properties
-  bstemBatter Float
-  theta       Float
-  bI          Float
-  sigmaBrg    Float
-  deltaS      Float
-  gRFill      Float
-  phiRFill    Float
-  phiFSoil    Float
-
-  // EQ Parameters
-  pga    Float
-  fPgaEq Float
-  kV     Float
-
-  // Design Height and Spacing
-  minDesignHeight Float
-  maxDesignHeight Float
-  sV              Float
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
-}
-
-// ─── Abutment Internal Stability ──────────────────────────────────────────────
-
-model AbutmentInternalStability {
-  id        String   @id @default(cuid())
-  projectId String
-  designId  String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Material Properties
+  // Geometry & Materials
   bstemBatter Float
   bI          Float
   deltaS      Float
   gRFill      Float
   phiRFill    Float
 
+  // External-only (foundation / bearing)
+  sigmaBrg Float
+  phiFSoil Float
+
   // EQ Parameters
   pga    Float
   fPgaEq Float
   kV     Float
 
-  // Extensible Reinforcement Parameters
-  phiPoGs   Float
-  alphaGs   Float
-  rcGs      Float
-  c         Float
+  // Extensible Reinforcement — Geosynthetic Strip
+  phiPoGs Float
+  alphaGs Float
+  rcGs    Float
+  c       Float
+
+  // Extensible Reinforcement — Geosynthetic Grid
   phiPoGg   Float
   phiPoGgEe Float
   alphaGg   Float
@@ -274,19 +168,21 @@ model AbutmentInternalStability {
   maxDh     Float
   a         Float
 
-  // Inextensible Reinforcement Parameters
+  // Inextensible Reinforcement — Steel Grid
   tSt     Float
   stSg    Float
   phiPoSg Float
   alphaSg Float
   rcSg    Float
+
+  // Inextensible Reinforcement — Steel Strip
   bSs     Float
   phiPoSs Float
   f2      Float
   alphaSs Float
   sh      Float
 
-  // Design Height and Spacing
+  // Design Heights and Spacing
   minDesignHeight Float
   maxDesignHeight Float
   sV              Float
@@ -295,33 +191,44 @@ model AbutmentInternalStability {
   design  Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
 }
 
-// ─── Wing Internal Stability ──────────────────────────────────────────────────
+// ─── Wing Design (external w/ LL + external w/o LL + internal merged) ─────────
 
-model WingInternalStability {
+model WingDesign {
   id        String   @id @default(cuid())
   projectId String
   designId  String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Material Properties
+  // LS Moment Arm
+  yev  Float
+  ylsV Float
+
+  // Geometry & Materials
   bstemBatter Float
+  theta       Float
   bI          Float
   deltaS      Float
   gRFill      Float
   phiRFill    Float
+
+  // External-only (foundation / bearing)
+  sigmaBrg Float
+  phiFSoil Float
 
   // EQ Parameters
   pga    Float
   fPgaEq Float
   kV     Float
 
-  // Extensible Reinforcement Parameters
-  phiPoGs   Float
-  alphaGs   Float
-  rcGs      Float
-  gStrip    Float
-  c         Float
+  // Extensible Reinforcement — Geosynthetic Strip
+  phiPoGs Float
+  alphaGs Float
+  rcGs    Float
+  gStrip  Float
+  c       Float
+
+  // Extensible Reinforcement — Geosynthetic Grid
   phiPoGg   Float
   phiPoGgEe Float
   alphaGg   Float
@@ -330,12 +237,14 @@ model WingInternalStability {
   a         Float
   maxDh     Float
 
-  // Inextensible Reinforcement Parameters
+  // Inextensible Reinforcement — Steel Grid
   tSt     Float
   stSg    Float
   phiPoSg Float
   alphaSg Float
   rcSg    Float
+
+  // Inextensible Reinforcement — Steel Strip
   bSs     Float
   phiPoSs Float
   alphaSs Float
@@ -343,7 +252,7 @@ model WingInternalStability {
   d60     Float
   d10     Float
 
-  // Design Height and Spacing
+  // Design Heights and Spacing
   minDesignHeight Float
   maxDesignHeight Float
   sV              Float

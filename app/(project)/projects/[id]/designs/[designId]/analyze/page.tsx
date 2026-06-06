@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileDown } from 'lucide-react';
 import { MinRlForm } from './min-rl-form';
 import { getDesignWithData } from '@/app/actions/design-inputs';
@@ -10,7 +11,6 @@ import {
   analyzeWingExternalLl,
   analyzeWingExternalNoLl,
   type AnalysisRow,
-  type ExternalStabilityParams,
 } from '@/lib/calculations/external-stability';
 import {
   analyzeAbutmentInternal,
@@ -28,6 +28,8 @@ function badgeClass(s: string) {
     : 'bg-red-100 text-red-700 border border-red-200';
 }
 
+// ─── Page dispatcher ──────────────────────────────────────────────────────────
+
 export default async function AnalyzePage({
   params,
   searchParams,
@@ -38,6 +40,7 @@ export default async function AnalyzePage({
   const { id, designId } = await params;
   const sp = await searchParams;
   const minRl = parseFloat(sp.minRl ?? '8');
+  const safeMinRl = isNaN(minRl) ? 8 : minRl;
 
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
@@ -47,54 +50,108 @@ export default async function AnalyzePage({
 
   const typeKey = design.designType.key;
 
-  if (typeKey === 'panel_face_design' && design.panelFaceDesign) {
+  if (typeKey === 'abutment' && design.abutmentDesign) {
+    const d = design.abutmentDesign;
+    const extRows = analyzeAbutmentExternal({ ...d, minRl: safeMinRl });
+    const intRows = analyzeAbutmentInternal({ ...d, minRl: safeMinRl });
+    return (
+      <AnalyzeShell
+        id={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={design.name}
+        minRl={safeMinRl}
+        showReportLinks
+      >
+        <Tabs defaultValue="external" className="w-full">
+          <TabsList>
+            <TabsTrigger value="external">External Stability</TabsTrigger>
+            <TabsTrigger value="internal">Internal Stability</TabsTrigger>
+          </TabsList>
+          <TabsContent value="external">
+            <ExternalResults rows={extRows} />
+          </TabsContent>
+          <TabsContent value="internal">
+            <InternalResults rows={intRows} />
+          </TabsContent>
+        </Tabs>
+      </AnalyzeShell>
+    );
+  }
+
+  if (typeKey === 'wing' && design.wingDesign) {
+    const d = design.wingDesign;
+    const extLlRows = analyzeWingExternalLl({ ...d, minRl: safeMinRl });
+    const extNoLlRows = analyzeWingExternalNoLl({ ...d, minRl: safeMinRl });
+    const intRows = analyzeWingInternal({ ...d, minRl: safeMinRl });
+    return (
+      <AnalyzeShell
+        id={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={design.name}
+        minRl={safeMinRl}
+        showReportLinks
+      >
+        <Tabs defaultValue="external-ll" className="w-full">
+          <TabsList>
+            <TabsTrigger value="external-ll">External (with LL)</TabsTrigger>
+            <TabsTrigger value="external-no-ll">External (without LL)</TabsTrigger>
+            <TabsTrigger value="internal">Internal Stability</TabsTrigger>
+          </TabsList>
+          <TabsContent value="external-ll">
+            <ExternalResults rows={extLlRows} />
+          </TabsContent>
+          <TabsContent value="external-no-ll">
+            <ExternalResults rows={extNoLlRows} />
+          </TabsContent>
+          <TabsContent value="internal">
+            <InternalResults rows={intRows} />
+          </TabsContent>
+        </Tabs>
+      </AnalyzeShell>
+    );
+  }
+
+  if (typeKey === 'panel_face' && design.panelFaceDesign) {
     const d = design.panelFaceDesign;
-    const r = analyzePanelFace({ ...d, tPanel: d.tPanel, ssr: d.ssr, cCoverPos: d.cCoverPos, cCoverNeg: d.cCoverNeg });
-    return <PanelFacePage result={r} typeName={design.designType.name} id={id} designId={designId} inputs={d} />;
+    const r = analyzePanelFace(d);
+    return (
+      <AnalyzeShell
+        id={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={design.name}
+        minRl={safeMinRl}
+        showReportLinks={false}
+      >
+        <PanelFaceResults result={r} inputs={d} />
+      </AnalyzeShell>
+    );
   }
 
-  if (typeKey === 'abutment_internal_stability' && design.abutmentInternalStability) {
-    const d = design.abutmentInternalStability;
-    const iRows = analyzeAbutmentInternal({ ...d, minRl });
-    return <InternalStabilityPage rows={iRows} typeName={design.designType.name} id={id} designId={designId} minRl={minRl} />;
-  }
+  notFound();
+}
 
-  if (typeKey === 'wing_internal_stability' && design.wingInternalStability) {
-    const d = design.wingInternalStability;
-    const iRows = analyzeWingInternal({ ...d, minRl });
-    return <InternalStabilityPage rows={iRows} typeName={design.designType.name} id={id} designId={designId} minRl={minRl} />;
-  }
+// ─── Shell (header + content slot) ────────────────────────────────────────────
 
-  let rows: AnalysisRow[] = [];
-
-  if (typeKey === 'abutment_external_stability' && design.abutmentExternalStability) {
-    const d = design.abutmentExternalStability;
-    rows = analyzeAbutmentExternal({
-      yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, bI: d.bI,
-      sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill, phiRFill: d.phiRFill,
-      phiFSoil: d.phiFSoil, pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
-      minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight, sV: d.sV, minRl,
-    } as ExternalStabilityParams);
-  } else if (typeKey === 'wing_external_stability_ll' && design.wingExternalStabilityLl) {
-    const d = design.wingExternalStabilityLl;
-    rows = analyzeWingExternalLl({
-      yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, theta: d.theta, bI: d.bI,
-      sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill, phiRFill: d.phiRFill,
-      phiFSoil: d.phiFSoil, pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
-      minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight, sV: d.sV, minRl,
-    });
-  } else if (typeKey === 'wing_external_stability' && design.wingExternalStability) {
-    const d = design.wingExternalStability;
-    rows = analyzeWingExternalNoLl({
-      yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, theta: d.theta, bI: d.bI,
-      sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill, phiRFill: d.phiRFill,
-      phiFSoil: d.phiFSoil, pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
-      minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight, sV: d.sV, minRl,
-    });
-  } else {
-    notFound();
-  }
-
+function AnalyzeShell({
+  id,
+  designId,
+  typeName,
+  designName,
+  minRl,
+  showReportLinks,
+  children,
+}: {
+  id: string;
+  designId: string;
+  typeName: string;
+  designName: string | null;
+  minRl: number;
+  showReportLinks: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -102,28 +159,39 @@ export default async function AnalyzePage({
           <Button variant="ghost" size="sm" asChild className="mb-1 -ml-2">
             <Link href={`/projects/${id}/designs/${designId}`}>← Back</Link>
           </Button>
-          <h1 className="text-2xl font-semibold text-slate-800">Analysis — {design.designType.name}</h1>
+          <h1 className="text-2xl font-semibold text-slate-800">Analysis — {typeName}</h1>
+          {designName && <p className="text-slate-500 text-sm">{designName}</p>}
         </div>
-        <div className="flex items-center gap-3">
-          <MinRlForm defaultValue={isNaN(minRl) ? 8 : minRl} />
-          <a
-            href={`/api/projects/${id}/designs/${designId}/report?format=xlsx&minRl=${isNaN(minRl) ? 8 : minRl}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-          >
-            <FileDown className="h-4 w-4" />
-            Excel
-          </a>
-          <a
-            href={`/api/projects/${id}/designs/${designId}/report?format=docx&minRl=${isNaN(minRl) ? 8 : minRl}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-          >
-            <FileDown className="h-4 w-4" />
-            Word
-          </a>
-        </div>
+        {showReportLinks && (
+          <div className="flex items-center gap-3">
+            <MinRlForm defaultValue={minRl} />
+            <a
+              href={`/api/projects/${id}/designs/${designId}/report?format=xlsx&minRl=${minRl}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              <FileDown className="h-4 w-4" />
+              Excel
+            </a>
+            <a
+              href={`/api/projects/${id}/designs/${designId}/report?format=docx&minRl=${minRl}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              <FileDown className="h-4 w-4" />
+              Word
+            </a>
+          </div>
+        )}
       </div>
+      {children}
+    </div>
+  );
+}
 
-      {/* Summary of Loads */}
+// ─── External Stability Results ───────────────────────────────────────────────
+
+function ExternalResults({ rows }: { rows: AnalysisRow[] }) {
+  return (
+    <div>
       <SectionTitle>Summary of Loads</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -146,7 +214,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Load Combinations */}
       <SectionTitle>Load Combinations</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -175,7 +242,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Design Check — Strength I */}
       <SectionTitle>Design Check — Strength I</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -202,7 +268,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Design Check — Extreme Event I */}
       <SectionTitle>Design Check — Extreme Event I</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -229,7 +294,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Design Check — Service I */}
       <SectionTitle>Design Check — Service I</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -248,7 +312,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Percentage Demand */}
       <SectionTitle>Percentage Demand (%)</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -274,7 +337,6 @@ export default async function AnalyzePage({
         </tbody>
       </TableWrap>
 
-      {/* Demand Summary */}
       <SectionTitle>Demand Summary</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -299,41 +361,177 @@ export default async function AnalyzePage({
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-base font-semibold text-slate-700 mt-6 mb-2">{children}</h2>;
-}
+// ─── Internal Stability Results ───────────────────────────────────────────────
 
-function TableWrap({ children }: { children: React.ReactNode }) {
+function InternalResults({ rows }: { rows: InternalStabilityRow[] }) {
   return (
-    <div className="rounded-xl border bg-card overflow-x-auto mb-4">
-      <table className="w-full text-sm whitespace-nowrap">{children}</table>
+    <div>
+      <SectionTitle>Stress / Load Determination at Reinforcement Level</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>DH (ft)</Th><Th>RL (ft)</Th><Th>z (ft)</Th>
+            <Th>σEV.Z (ksf)</Th><Th>h_eq (ft)</Th><Th>σLS.Z (ksf)</Th>
+            <Th>ωIR (kip/ft)</Th><Th>ωAE (kip/ft)</Th><Th>ωEQ.1</Th><Th>ωEQ.2</Th><Th>PEQ</Th><Th>σEQ</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.dh, 2)}</Td><Td>{N(r.rl, 2)}</Td><Td>{N(r.z, 2)}</Td>
+              <Td>{N(r.sEvZ)}</Td><Td>{N(r.hEq, 1)}</Td><Td>{N(r.sLsZ)}</Td>
+              <Td>{N(r.wIr, 3)}</Td><Td>{N(r.wAe, 3)}</Td><Td>{N(r.wEq1, 3)}</Td><Td>{N(r.wEq2, 3)}</Td><Td>{N(r.pEq, 3)}</Td><Td>{N(r.sEq, 3)}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Geosynthetic Strip</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>z (ft)</Th>
+            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
+            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
+            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
+            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.z, 2)}</Td>
+              <Td>{N(r.sVStrI)}</Td><Td>{N(r.sHStrI)}</Td><Td>{N(r.sVEeI)}</Td><Td>{N(r.sHEeI)}</Td>
+              <Td>{N(r.tMaxStrIGstrip)}</Td><Td>{N(r.tMaxEeIGstrip)}</Td>
+              <Td>{N(r.lEStrIGs, 3)}</Td><Td>{N(r.lEEeIGs, 3)}</Td><Td>{N(r.lEGeostrip, 3)}</Td><Td>{N(r.lAGs, 3)}</Td><Td>{N(r.rlMinGeostrip, 3)}</Td>
+              <Td>{N(r.ltdsGeostrip, 0)}</Td>
+              <td className="px-3 py-2"><CheckBadge v={r.poGeostripCheck} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Geosynthetic Grid</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>z (ft)</Th>
+            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
+            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
+            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
+            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.z, 2)}</Td>
+              <Td>{N(r.sVStrI)}</Td><Td>{N(r.sHStrI)}</Td><Td>{N(r.sVEeI)}</Td><Td>{N(r.sHEeI)}</Td>
+              <Td>{N(r.tMaxStrIGgrid)}</Td><Td>{N(r.tMaxEeIGgrid)}</Td>
+              <Td>{N(r.lEStrIGg, 3)}</Td><Td>{N(r.lEEeIGg, 3)}</Td><Td>{N(r.lEGeogrid, 3)}</Td><Td>{N(r.lAGg, 3)}</Td><Td>{N(r.rlMinGeogrid, 3)}</Td>
+              <Td>{N(r.ltdsGeogrid, 0)}</Td>
+              <td className="px-3 py-2"><CheckBadge v={r.poGeogridCheck} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Metal Grid</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>z (ft)</Th><Th>F&apos;</Th><Th>kR.SteelGrid</Th>
+            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
+            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
+            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
+            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.z, 2)}</Td><Td>{N(r.fpMg)}</Td><Td>{N(r.krSg)}</Td>
+              <Td>{N(r.sVStrIMg)}</Td><Td>{N(r.sHStrIMg)}</Td><Td>{N(r.sVEeIMg)}</Td><Td>{N(r.sHEeIMg)}</Td>
+              <Td>{N(r.tMaxStrISg)}</Td><Td>{N(r.tMaxEeISg)}</Td>
+              <Td>{N(r.lEStrIMg, 3)}</Td><Td>{N(r.lEEeIMg, 3)}</Td><Td>{N(r.lESg, 3)}</Td><Td>{N(r.lASg, 2)}</Td><Td>{N(r.rlMinSg, 3)}</Td>
+              <Td>{N(r.ltdsSg, 0)}</Td>
+              <td className="px-3 py-2"><CheckBadge v={r.poSgCheck} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Ribbed Metallic Strip</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <Th>z (ft)</Th><Th>F&apos;</Th><Th>kR.SteelStrip</Th>
+            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
+            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
+            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
+            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.z, 2)}</Td><Td>{N(r.fpSs)}</Td><Td>{N(r.krSs)}</Td>
+              <Td>{N(r.sVStrISs)}</Td><Td>{N(r.sHStrISs)}</Td><Td>{N(r.sVEeISs)}</Td><Td>{N(r.sHEeISs)}</Td>
+              <Td>{N(r.tMaxStrISs)}</Td><Td>{N(r.tMaxEeISs)}</Td>
+              <Td>{N(r.lEStrISs, 3)}</Td><Td>{N(r.lEEeISs, 3)}</Td><Td>{N(r.lESs, 3)}</Td><Td>{N(r.lASs, 2)}</Td><Td>{N(r.rlMinSs, 3)}</Td>
+              <Td>{N(r.ltdsSs, 0)}</Td>
+              <td className="px-3 py-2"><CheckBadge v={r.poSsCheck} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Required Factored Long Term Design Strength, LTDS (lb/ft)</SectionTitle>
+      <TableWrap>
+        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium" rowSpan={2}>z (ft)</th>
+            <th className="px-3 py-2 text-center font-medium border-l" colSpan={4}>Strength I</th>
+            <th className="px-3 py-2 text-center font-medium border-l" colSpan={4}>Extreme Event I</th>
+          </tr>
+          <tr>
+            <Th>Geosynthetic Strip</Th><Th>Geosynthetic Grid</Th><Th>Metallic Grid</Th><Th>Metallic Strip</Th>
+            <Th>Geosynthetic Strip</Th><Th>Geosynthetic Grid</Th><Th>Metallic Grid</Th><Th>Metallic Strip</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y text-sm">
+          {rows.map((r) => (
+            <tr key={r.dh} className="hover:bg-slate-50">
+              <Td>{N(r.z, 2)}</Td>
+              <Td>{N(r.ltdsGeostrip, 0)}</Td><Td>{N(r.ltdsGeogrid, 0)}</Td><Td>{N(r.ltdsSg, 0)}</Td><Td>{N(r.ltdsSs, 0)}</Td>
+              <Td>{N(r.ltdsEeIGs, 0)}</Td><Td>{N(r.ltdsEeIGg, 0)}</Td><Td>{N(r.ltdsEeISg, 0)}</Td><Td>{N(r.ltdsEeISs, 0)}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      <SectionTitle>Internal Stability — LTDS Chart</SectionTitle>
+      <div className="rounded-xl border bg-card p-4 mb-4">
+        <InternalStabilityChart
+          zValues={rows.map((r) => r.z)}
+          dhValues={rows.map((r) => r.dh)}
+          ltdsGeostrip={rows.map((r) => r.ltdsGeostrip)}
+          ltdsGeogrid={rows.map((r) => r.ltdsGeogrid)}
+          ltdsSg={rows.map((r) => r.ltdsSg)}
+          ltdsSs={rows.map((r) => r.ltdsSs)}
+        />
+      </div>
     </div>
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-3 py-2 text-left font-medium">{children}</th>;
-}
+// ─── Panel Face Results (unchanged behavior) ──────────────────────────────────
 
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-3 py-2 text-slate-600">{children}</td>;
-}
-
-// ─── Internal Stability Page ───────────────────────────────────────────────────
-
-// ─── Panel Face Design Page ────────────────────────────────────────────────────
-
-function PanelFacePage({
+function PanelFaceResults({
   result: r,
-  typeName,
-  id,
-  designId,
   inputs,
 }: {
   result: PanelFaceResult;
-  typeName: string;
-  id: string;
-  designId: string;
   inputs: {
     barNumVert: number; spacingVert: number;
     barNumHor: number; spacingHor: number;
@@ -345,16 +543,6 @@ function PanelFacePage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="mb-1 -ml-2">
-            <Link href={`/projects/${id}/designs/${designId}`}>← Back</Link>
-          </Button>
-          <h1 className="text-2xl font-semibold text-slate-800">Analysis — {typeName}</h1>
-        </div>
-      </div>
-
-      {/* 1. Factored Load on Panel */}
       <SectionTitle>Factored Load on Panel</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -379,7 +567,6 @@ function PanelFacePage({
         </tbody>
       </TableWrap>
 
-      {/* 2. Concrete Cracking Moment */}
       <SectionTitle>Concrete Cracking Moment</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -398,7 +585,6 @@ function PanelFacePage({
         </tbody>
       </TableWrap>
 
-      {/* 3. Minimum Applied Moment & Factored Ultimate Moment */}
       <SectionTitle>Minimum Applied Moment &amp; Factored Ultimate Moment</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -421,7 +607,6 @@ function PanelFacePage({
         </tbody>
       </TableWrap>
 
-      {/* 4. Horizontal Positive Flexural Capacity */}
       <SectionTitle>Horizontal Positive Flexural Capacity</SectionTitle>
       <FlexureTable
         beta1={r.beta1} alpha1={r.alpha1}
@@ -431,7 +616,6 @@ function PanelFacePage({
         barNum={inputs.barNumHor} spacing={inputs.spacingHor}
       />
 
-      {/* 5. Vertical Positive Flexural Capacity */}
       <SectionTitle>Vertical Positive Flexural Capacity</SectionTitle>
       <FlexureTable
         beta1={r.beta1} alpha1={r.alpha1}
@@ -441,7 +625,6 @@ function PanelFacePage({
         barNum={inputs.barNumVert} spacing={inputs.spacingVert}
       />
 
-      {/* 6. Horizontal Negative Flexural Capacity */}
       <SectionTitle>Horizontal Negative Flexural Capacity</SectionTitle>
       <FlexureTable
         beta1={r.beta1} alpha1={r.alpha1}
@@ -451,7 +634,6 @@ function PanelFacePage({
         barNum={inputs.barNumHor} spacing={inputs.spacingHor}
       />
 
-      {/* 7. Vertical Negative Flexural Capacity */}
       <SectionTitle>Vertical Negative Flexural Capacity</SectionTitle>
       <FlexureTable
         beta1={r.beta1} alpha1={r.alpha1}
@@ -461,7 +643,6 @@ function PanelFacePage({
         barNum={inputs.barNumVert} spacing={inputs.spacingVert}
       />
 
-      {/* 8. Service I: Crack Control — Horizontal */}
       <SectionTitle>Service I: Service Crack Control — Horizontal Reinforcement</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -487,12 +668,11 @@ function PanelFacePage({
             <Td>{N(r.dc_Hor)}</Td>
             <Td>{N(r.Vs_Hor)}</Td>
             <Td>{N(r.Smax_Hor)}</Td>
-            <td className="px-3 py-2"><PFCheck v={r.check_crack_Hor} /></td>
+            <td className="px-3 py-2"><CheckBadge v={r.check_crack_Hor} /></td>
           </tr>
         </tbody>
       </TableWrap>
 
-      {/* 9. Service I: Crack Control — Vertical */}
       <SectionTitle>Service I: Service Crack Control — Vertical Reinforcement</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -518,12 +698,11 @@ function PanelFacePage({
             <Td>{N(r.dc_Vert)}</Td>
             <Td>{N(r.Vs_Vert)}</Td>
             <Td>{N(r.Smax_Vert)}</Td>
-            <td className="px-3 py-2"><PFCheck v={r.check_crack_Vert} /></td>
+            <td className="px-3 py-2"><CheckBadge v={r.check_crack_Vert} /></td>
           </tr>
         </tbody>
       </TableWrap>
 
-      {/* 10. Strength I: Shear Capacity */}
       <SectionTitle>Strength I: Shear Capacity</SectionTitle>
       <TableWrap>
         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
@@ -549,11 +728,42 @@ function PanelFacePage({
             <Td>{N(Math.min(r.Vc, r.Vc_max))}</Td>
             <Td>{N(r.phiVc)}</Td>
             <Td>{N(r.phiVc / r.VU_panel)}</Td>
-            <td className="px-3 py-2"><PFCheck v={r.check_shear} /></td>
+            <td className="px-3 py-2"><CheckBadge v={r.check_shear} /></td>
           </tr>
         </tbody>
       </TableWrap>
     </div>
+  );
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-base font-semibold text-slate-700 mt-6 mb-2">{children}</h2>;
+}
+
+function TableWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border bg-card overflow-x-auto mb-4">
+      <table className="w-full text-sm whitespace-nowrap">{children}</table>
+    </div>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return <th className="px-3 py-2 text-left font-medium">{children}</th>;
+}
+
+function Td({ children }: { children: React.ReactNode }) {
+  return <td className="px-3 py-2 text-slate-600">{children}</td>;
+}
+
+function CheckBadge({ v }: { v: string }) {
+  const ok = v === 'Adequate';
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs ${ok ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+      {v}
+    </span>
   );
 }
 
@@ -602,234 +812,5 @@ function FlexureTable({
         </tr>
       </tbody>
     </TableWrap>
-  );
-}
-
-function PFCheck({ v }: { v: string }) {
-  const ok = v === 'Adequate';
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs ${ok ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
-      {v}
-    </span>
-  );
-}
-
-function Check({ v }: { v: string }) {
-  const ok = v === 'Adequate';
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs ${ok ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
-      {v}
-    </span>
-  );
-}
-
-function InternalStabilityPage({
-  rows, typeName, id, designId, minRl,
-}: {
-  rows: InternalStabilityRow[];
-  typeName: string;
-  id: string;
-  designId: string;
-  minRl: number;
-}) {
-  const safeMinRl = isNaN(minRl) ? 8 : minRl;
-  const reportBase = `/api/projects/${id}/designs/${designId}/report?minRl=${safeMinRl}`;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="mb-1 -ml-2">
-            <Link href={`/projects/${id}/designs/${designId}`}>← Back</Link>
-          </Button>
-          <h1 className="text-2xl font-semibold text-slate-800">Analysis — {typeName}</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <form method="GET" className="flex items-center gap-2">
-            <label className="text-sm text-slate-600">Min RL (ft):</label>
-            <input
-              name="minRl"
-              type="number"
-              step="any"
-              defaultValue={safeMinRl}
-              className="w-20 rounded border border-input px-2 py-1 text-sm"
-            />
-            <Button type="submit" size="sm" variant="outline">Update</Button>
-          </form>
-          <a
-            href={`${reportBase}&format=xlsx`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-          >
-            <FileDown className="h-4 w-4" />
-            Excel
-          </a>
-          <a
-            href={`${reportBase}&format=docx`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-          >
-            <FileDown className="h-4 w-4" />
-            Word
-          </a>
-        </div>
-      </div>
-
-      <SectionTitle>Stress / Load Determination at Reinforcement Level</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <Th>DH (ft)</Th><Th>RL (ft)</Th><Th>z (ft)</Th>
-            <Th>σEV.Z (ksf)</Th><Th>h_eq (ft)</Th><Th>σLS.Z (ksf)</Th>
-            <Th>ωIR (kip/ft)</Th><Th>ωAE (kip/ft)</Th><Th>ωEQ.1</Th><Th>ωEQ.2</Th><Th>PEQ</Th><Th>σEQ</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.dh, 2)}</Td><Td>{N(r.rl, 2)}</Td><Td>{N(r.z, 2)}</Td>
-              <Td>{N(r.sEvZ)}</Td><Td>{N(r.hEq, 1)}</Td><Td>{N(r.sLsZ)}</Td>
-              <Td>{N(r.wIr, 3)}</Td><Td>{N(r.wAe, 3)}</Td><Td>{N(r.wEq1, 3)}</Td><Td>{N(r.wEq2, 3)}</Td><Td>{N(r.pEq, 3)}</Td><Td>{N(r.sEq, 3)}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      <SectionTitle>Geosynthetic Strip</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <Th>z (ft)</Th>
-            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
-            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
-            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
-            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.z, 2)}</Td>
-              <Td>{N(r.sVStrI)}</Td><Td>{N(r.sHStrI)}</Td><Td>{N(r.sVEeI)}</Td><Td>{N(r.sHEeI)}</Td>
-              <Td>{N(r.tMaxStrIGstrip)}</Td><Td>{N(r.tMaxEeIGstrip)}</Td>
-              <Td>{N(r.lEStrIGs, 3)}</Td><Td>{N(r.lEEeIGs, 3)}</Td><Td>{N(r.lEGeostrip, 3)}</Td><Td>{N(r.lAGs, 3)}</Td><Td>{N(r.rlMinGeostrip, 3)}</Td>
-              <Td>{N(r.ltdsGeostrip, 0)}</Td>
-              <td className="px-3 py-2"><Check v={r.poGeostripCheck} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      <SectionTitle>Geosynthetic Grid</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <Th>z (ft)</Th>
-            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
-            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
-            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
-            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.z, 2)}</Td>
-              <Td>{N(r.sVStrI)}</Td><Td>{N(r.sHStrI)}</Td><Td>{N(r.sVEeI)}</Td><Td>{N(r.sHEeI)}</Td>
-              <Td>{N(r.tMaxStrIGgrid)}</Td><Td>{N(r.tMaxEeIGgrid)}</Td>
-              <Td>{N(r.lEStrIGg, 3)}</Td><Td>{N(r.lEEeIGg, 3)}</Td><Td>{N(r.lEGeogrid, 3)}</Td><Td>{N(r.lAGg, 3)}</Td><Td>{N(r.rlMinGeogrid, 3)}</Td>
-              <Td>{N(r.ltdsGeogrid, 0)}</Td>
-              <td className="px-3 py-2"><Check v={r.poGeogridCheck} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      <SectionTitle>Metal Grid</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <Th>z (ft)</Th><Th>F&apos;</Th><Th>kR.SteelGrid</Th>
-            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
-            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
-            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
-            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.z, 2)}</Td><Td>{N(r.fpMg)}</Td><Td>{N(r.krSg)}</Td>
-              <Td>{N(r.sVStrIMg)}</Td><Td>{N(r.sHStrIMg)}</Td><Td>{N(r.sVEeIMg)}</Td><Td>{N(r.sHEeIMg)}</Td>
-              <Td>{N(r.tMaxStrISg)}</Td><Td>{N(r.tMaxEeISg)}</Td>
-              <Td>{N(r.lEStrIMg, 3)}</Td><Td>{N(r.lEEeIMg, 3)}</Td><Td>{N(r.lESg, 3)}</Td><Td>{N(r.lASg, 2)}</Td><Td>{N(r.rlMinSg, 3)}</Td>
-              <Td>{N(r.ltdsSg, 0)}</Td>
-              <td className="px-3 py-2"><Check v={r.poSgCheck} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      <SectionTitle>Ribbed Metallic Strip</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <Th>z (ft)</Th><Th>F&apos;</Th><Th>kR.SteelStrip</Th>
-            <Th>σV Str-I (ksf)</Th><Th>σH Str-I (ksf)</Th><Th>σV EE-I (ksf)</Th><Th>σH EE-I (ksf)</Th>
-            <Th>Tmax Str-I (kip/ft)</Th><Th>Tmax EE-I (kip/ft)</Th>
-            <Th>lE Str-I (ft)</Th><Th>lE EE-I (ft)</Th><Th>lE (ft)</Th><Th>lA (ft)</Th><Th>RL min (ft)</Th>
-            <Th>LTDS (lb/ft)</Th><Th>PO Check</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.z, 2)}</Td><Td>{N(r.fpSs)}</Td><Td>{N(r.krSs)}</Td>
-              <Td>{N(r.sVStrISs)}</Td><Td>{N(r.sHStrISs)}</Td><Td>{N(r.sVEeISs)}</Td><Td>{N(r.sHEeISs)}</Td>
-              <Td>{N(r.tMaxStrISs)}</Td><Td>{N(r.tMaxEeISs)}</Td>
-              <Td>{N(r.lEStrISs, 3)}</Td><Td>{N(r.lEEeISs, 3)}</Td><Td>{N(r.lESs, 3)}</Td><Td>{N(r.lASs, 2)}</Td><Td>{N(r.rlMinSs, 3)}</Td>
-              <Td>{N(r.ltdsSs, 0)}</Td>
-              <td className="px-3 py-2"><Check v={r.poSsCheck} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      {/* Combined LTDS table — matches old Vue template exactly */}
-      <SectionTitle>Required Factored Long Term Design Strength, LTDS (lb/ft)</SectionTitle>
-      <TableWrap>
-        <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
-          <tr>
-            <th className="px-3 py-2 text-left font-medium" rowSpan={2}>z (ft)</th>
-            <th className="px-3 py-2 text-center font-medium border-l" colSpan={4}>Strength I</th>
-            <th className="px-3 py-2 text-center font-medium border-l" colSpan={4}>Extreme Event I</th>
-          </tr>
-          <tr>
-            <Th>Geosynthetic Strip</Th><Th>Geosynthetic Grid</Th><Th>Metallic Grid</Th><Th>Metallic Strip</Th>
-            <Th>Geosynthetic Strip</Th><Th>Geosynthetic Grid</Th><Th>Metallic Grid</Th><Th>Metallic Strip</Th>
-          </tr>
-        </thead>
-        <tbody className="divide-y text-sm">
-          {rows.map((r) => (
-            <tr key={r.dh} className="hover:bg-slate-50">
-              <Td>{N(r.z, 2)}</Td>
-              <Td>{N(r.ltdsGeostrip, 0)}</Td><Td>{N(r.ltdsGeogrid, 0)}</Td><Td>{N(r.ltdsSg, 0)}</Td><Td>{N(r.ltdsSs, 0)}</Td>
-              <Td>{N(r.ltdsEeIGs, 0)}</Td><Td>{N(r.ltdsEeIGg, 0)}</Td><Td>{N(r.ltdsEeISg, 0)}</Td><Td>{N(r.ltdsEeISs, 0)}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
-
-      {/* LTDS chart — matches old Vue Chart.js scatter/line chart */}
-      <SectionTitle>Internal Stability — LTDS Chart</SectionTitle>
-      <div className="rounded-xl border bg-card p-4 mb-4">
-        <InternalStabilityChart
-          zValues={rows.map((r) => r.z)}
-          dhValues={rows.map((r) => r.dh)}
-          ltdsGeostrip={rows.map((r) => r.ltdsGeostrip)}
-          ltdsGeogrid={rows.map((r) => r.ltdsGeogrid)}
-          ltdsSg={rows.map((r) => r.ltdsSg)}
-          ltdsSs={rows.map((r) => r.ltdsSs)}
-        />
-      </div>
-    </div>
   );
 }

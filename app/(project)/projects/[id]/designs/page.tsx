@@ -26,22 +26,13 @@ export default async function DesignsPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex items-center gap-2">
           {designs.length > 0 && (
-            <>
-              <a
-                href={`/api/projects/${id}/report?format=docx`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-              >
-                <FileDown className="h-4 w-4" />
-                Word Report
-              </a>
-              <a
-                href={`/api/projects/${id}/report?format=pdf`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-              >
-                <FileDown className="h-4 w-4" />
-                PDF Report
-              </a>
-            </>
+            <a
+              href={`/api/projects/${id}/report`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              <FileDown className="h-4 w-4" />
+              Report
+            </a>
           )}
           <Button asChild size="sm">
             <Link href={`/projects/${id}/designs/add`}>

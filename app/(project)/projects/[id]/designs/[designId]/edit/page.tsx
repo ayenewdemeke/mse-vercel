@@ -2,17 +2,14 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import {
   getDesignWithData,
-  updateAbutmentExternal,
-  updateWingExternalLl,
-  updateWingExternal,
-  updateAbutmentInternal,
-  updateWingInternal,
+  updateAbutment,
+  updateWing,
   updatePanelFace,
 } from '@/app/actions/design-inputs';
 import { getProject } from '@/app/actions/projects';
-import ExternalStabilityEditForm from './external-stability-edit-form';
-import InternalStabilityEditForm from './internal-stability-edit-form';
-import PanelFaceEditForm from './panel-face-edit-form';
+import AbutmentForm from '../../create/[typeKey]/abutment-form';
+import WingForm from '../../create/[typeKey]/wing-form';
+import PanelFaceForm from '../../create/[typeKey]/panel-face-form';
 
 export default async function DesignEditPage({
   params,
@@ -34,62 +31,41 @@ export default async function DesignEditPage({
   const typeKey = design.designType.key;
   const designName = design.name;
 
-  if (typeKey === 'abutment_external_stability' && design.abutmentExternalStability) {
+  if (typeKey === 'abutment' && design.abutmentDesign) {
     return (
-      <ExternalStabilityEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} hasTheta={false} action={updateAbutmentExternal}
-        data={design.abutmentExternalStability}
+      <AbutmentForm
+        projectId={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={designName}
+        data={design.abutmentDesign}
+        action={updateAbutment}
       />
     );
   }
 
-  if (typeKey === 'wing_external_stability_ll' && design.wingExternalStabilityLl) {
+  if (typeKey === 'wing' && design.wingDesign) {
     return (
-      <ExternalStabilityEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} hasTheta action={updateWingExternalLl}
-        data={design.wingExternalStabilityLl}
+      <WingForm
+        projectId={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={designName}
+        data={design.wingDesign}
+        action={updateWing}
       />
     );
   }
 
-  if (typeKey === 'wing_external_stability' && design.wingExternalStability) {
+  if (typeKey === 'panel_face' && design.panelFaceDesign) {
     return (
-      <ExternalStabilityEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} hasTheta action={updateWingExternal}
-        data={design.wingExternalStability}
-      />
-    );
-  }
-
-  if (typeKey === 'abutment_internal_stability' && design.abutmentInternalStability) {
-    return (
-      <InternalStabilityEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} isWing={false} action={updateAbutmentInternal}
-        data={design.abutmentInternalStability}
-      />
-    );
-  }
-
-  if (typeKey === 'wing_internal_stability' && design.wingInternalStability) {
-    return (
-      <InternalStabilityEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} isWing action={updateWingInternal}
-        data={design.wingInternalStability}
-      />
-    );
-  }
-
-  if (typeKey === 'panel_face_design' && design.panelFaceDesign) {
-    return (
-      <PanelFaceEditForm
-        projectId={id} designId={designId} typeName={design.designType.name}
-        designName={designName} action={updatePanelFace}
+      <PanelFaceForm
+        projectId={id}
+        designId={designId}
+        typeName={design.designType.name}
+        designName={designName}
         data={design.panelFaceDesign}
+        action={updatePanelFace}
       />
     );
   }

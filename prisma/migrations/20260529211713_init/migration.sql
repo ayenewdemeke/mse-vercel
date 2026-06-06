@@ -90,7 +90,7 @@ CREATE TABLE "Design" (
 );
 
 -- CreateTable
-CREATE TABLE "AbutmentExternalStability" (
+CREATE TABLE "AbutmentDesign" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "designId" TEXT NOT NULL,
@@ -100,87 +100,11 @@ CREATE TABLE "AbutmentExternalStability" (
     "ylsV" DOUBLE PRECISION NOT NULL,
     "bstemBatter" DOUBLE PRECISION NOT NULL,
     "bI" DOUBLE PRECISION NOT NULL,
+    "deltaS" DOUBLE PRECISION NOT NULL,
+    "gRFill" DOUBLE PRECISION NOT NULL,
+    "phiRFill" DOUBLE PRECISION NOT NULL,
     "sigmaBrg" DOUBLE PRECISION NOT NULL,
-    "deltaS" DOUBLE PRECISION NOT NULL,
-    "gRFill" DOUBLE PRECISION NOT NULL,
-    "phiRFill" DOUBLE PRECISION NOT NULL,
     "phiFSoil" DOUBLE PRECISION NOT NULL,
-    "pga" DOUBLE PRECISION NOT NULL,
-    "fPgaEq" DOUBLE PRECISION NOT NULL,
-    "kV" DOUBLE PRECISION NOT NULL,
-    "minDesignHeight" DOUBLE PRECISION NOT NULL,
-    "maxDesignHeight" DOUBLE PRECISION NOT NULL,
-    "sV" DOUBLE PRECISION NOT NULL,
-
-    CONSTRAINT "AbutmentExternalStability_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "WingExternalStabilityLl" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "designId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "yev" DOUBLE PRECISION NOT NULL,
-    "ylsV" DOUBLE PRECISION NOT NULL,
-    "bstemBatter" DOUBLE PRECISION NOT NULL,
-    "theta" DOUBLE PRECISION NOT NULL,
-    "bI" DOUBLE PRECISION NOT NULL,
-    "sigmaBrg" DOUBLE PRECISION NOT NULL,
-    "deltaS" DOUBLE PRECISION NOT NULL,
-    "gRFill" DOUBLE PRECISION NOT NULL,
-    "phiRFill" DOUBLE PRECISION NOT NULL,
-    "phiFSoil" DOUBLE PRECISION NOT NULL,
-    "pga" DOUBLE PRECISION NOT NULL,
-    "fPgaEq" DOUBLE PRECISION NOT NULL,
-    "kV" DOUBLE PRECISION NOT NULL,
-    "minDesignHeight" DOUBLE PRECISION NOT NULL,
-    "maxDesignHeight" DOUBLE PRECISION NOT NULL,
-    "sV" DOUBLE PRECISION NOT NULL,
-
-    CONSTRAINT "WingExternalStabilityLl_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "WingExternalStability" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "designId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "yev" DOUBLE PRECISION NOT NULL,
-    "ylsV" DOUBLE PRECISION NOT NULL,
-    "bstemBatter" DOUBLE PRECISION NOT NULL,
-    "theta" DOUBLE PRECISION NOT NULL,
-    "bI" DOUBLE PRECISION NOT NULL,
-    "sigmaBrg" DOUBLE PRECISION NOT NULL,
-    "deltaS" DOUBLE PRECISION NOT NULL,
-    "gRFill" DOUBLE PRECISION NOT NULL,
-    "phiRFill" DOUBLE PRECISION NOT NULL,
-    "phiFSoil" DOUBLE PRECISION NOT NULL,
-    "pga" DOUBLE PRECISION NOT NULL,
-    "fPgaEq" DOUBLE PRECISION NOT NULL,
-    "kV" DOUBLE PRECISION NOT NULL,
-    "minDesignHeight" DOUBLE PRECISION NOT NULL,
-    "maxDesignHeight" DOUBLE PRECISION NOT NULL,
-    "sV" DOUBLE PRECISION NOT NULL,
-
-    CONSTRAINT "WingExternalStability_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "AbutmentInternalStability" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "designId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "bstemBatter" DOUBLE PRECISION NOT NULL,
-    "bI" DOUBLE PRECISION NOT NULL,
-    "deltaS" DOUBLE PRECISION NOT NULL,
-    "gRFill" DOUBLE PRECISION NOT NULL,
-    "phiRFill" DOUBLE PRECISION NOT NULL,
     "pga" DOUBLE PRECISION NOT NULL,
     "fPgaEq" DOUBLE PRECISION NOT NULL,
     "kV" DOUBLE PRECISION NOT NULL,
@@ -209,21 +133,26 @@ CREATE TABLE "AbutmentInternalStability" (
     "maxDesignHeight" DOUBLE PRECISION NOT NULL,
     "sV" DOUBLE PRECISION NOT NULL,
 
-    CONSTRAINT "AbutmentInternalStability_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "AbutmentDesign_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "WingInternalStability" (
+CREATE TABLE "WingDesign" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "designId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "yev" DOUBLE PRECISION NOT NULL,
+    "ylsV" DOUBLE PRECISION NOT NULL,
     "bstemBatter" DOUBLE PRECISION NOT NULL,
+    "theta" DOUBLE PRECISION NOT NULL,
     "bI" DOUBLE PRECISION NOT NULL,
     "deltaS" DOUBLE PRECISION NOT NULL,
     "gRFill" DOUBLE PRECISION NOT NULL,
     "phiRFill" DOUBLE PRECISION NOT NULL,
+    "sigmaBrg" DOUBLE PRECISION NOT NULL,
+    "phiFSoil" DOUBLE PRECISION NOT NULL,
     "pga" DOUBLE PRECISION NOT NULL,
     "fPgaEq" DOUBLE PRECISION NOT NULL,
     "kV" DOUBLE PRECISION NOT NULL,
@@ -254,7 +183,32 @@ CREATE TABLE "WingInternalStability" (
     "maxDesignHeight" DOUBLE PRECISION NOT NULL,
     "sV" DOUBLE PRECISION NOT NULL,
 
-    CONSTRAINT "WingInternalStability_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "WingDesign_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PanelFaceDesign" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "designId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "fc" DOUBLE PRECISION NOT NULL,
+    "fy" DOUBLE PRECISION NOT NULL,
+    "lPanel" DOUBLE PRECISION NOT NULL,
+    "hPanel" DOUBLE PRECISION NOT NULL,
+    "tPanel" DOUBLE PRECISION NOT NULL,
+    "ssr" DOUBLE PRECISION NOT NULL,
+    "cCoverPos" DOUBLE PRECISION NOT NULL,
+    "cCoverNeg" DOUBLE PRECISION NOT NULL,
+    "barNumVert" DOUBLE PRECISION NOT NULL,
+    "spacingVert" DOUBLE PRECISION NOT NULL,
+    "barNumHor" DOUBLE PRECISION NOT NULL,
+    "spacingHor" DOUBLE PRECISION NOT NULL,
+    "huStr" DOUBLE PRECISION NOT NULL,
+    "huEe" DOUBLE PRECISION NOT NULL,
+
+    CONSTRAINT "PanelFaceDesign_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -270,19 +224,13 @@ CREATE UNIQUE INDEX "Member_userId_projectId_key" ON "Member"("userId", "project
 CREATE UNIQUE INDEX "DesignType_key_key" ON "DesignType"("key");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AbutmentExternalStability_designId_key" ON "AbutmentExternalStability"("designId");
+CREATE UNIQUE INDEX "AbutmentDesign_designId_key" ON "AbutmentDesign"("designId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "WingExternalStabilityLl_designId_key" ON "WingExternalStabilityLl"("designId");
+CREATE UNIQUE INDEX "WingDesign_designId_key" ON "WingDesign"("designId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "WingExternalStability_designId_key" ON "WingExternalStability"("designId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AbutmentInternalStability_designId_key" ON "AbutmentInternalStability"("designId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "WingInternalStability_designId_key" ON "WingInternalStability"("designId");
+CREATE UNIQUE INDEX "PanelFaceDesign_designId_key" ON "PanelFaceDesign"("designId");
 
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -315,31 +263,19 @@ ALTER TABLE "Design" ADD CONSTRAINT "Design_projectId_fkey" FOREIGN KEY ("projec
 ALTER TABLE "Design" ADD CONSTRAINT "Design_designTypeId_fkey" FOREIGN KEY ("designTypeId") REFERENCES "DesignType"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AbutmentExternalStability" ADD CONSTRAINT "AbutmentExternalStability_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AbutmentDesign" ADD CONSTRAINT "AbutmentDesign_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AbutmentExternalStability" ADD CONSTRAINT "AbutmentExternalStability_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AbutmentDesign" ADD CONSTRAINT "AbutmentDesign_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WingExternalStabilityLl" ADD CONSTRAINT "WingExternalStabilityLl_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "WingDesign" ADD CONSTRAINT "WingDesign_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WingExternalStabilityLl" ADD CONSTRAINT "WingExternalStabilityLl_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "WingDesign" ADD CONSTRAINT "WingDesign_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WingExternalStability" ADD CONSTRAINT "WingExternalStability_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "PanelFaceDesign" ADD CONSTRAINT "PanelFaceDesign_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WingExternalStability" ADD CONSTRAINT "WingExternalStability_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AbutmentInternalStability" ADD CONSTRAINT "AbutmentInternalStability_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AbutmentInternalStability" ADD CONSTRAINT "AbutmentInternalStability_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WingInternalStability" ADD CONSTRAINT "WingInternalStability_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WingInternalStability" ADD CONSTRAINT "WingInternalStability_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "PanelFaceDesign" ADD CONSTRAINT "PanelFaceDesign_designId_fkey" FOREIGN KEY ("designId") REFERENCES "Design"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -14,7 +14,6 @@ import {
 import { analyzePanelFace } from '@/lib/calculations/panel-face';
 import {
   generateProjectDocx,
-  generateProjectPdf,
   type DesignSection,
   type ProjectReportData,
 } from '@/lib/reports/project-report';
@@ -29,7 +28,6 @@ export async function GET(
   const session = await auth();
   if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
 
-  const format = req.nextUrl.searchParams.get('format') ?? 'docx';
   const minRl = parseFloat(req.nextUrl.searchParams.get('minRl') ?? String(DEFAULT_MIN_RL));
   const safeMinRl = isNaN(minRl) ? DEFAULT_MIN_RL : minRl;
 
@@ -53,11 +51,8 @@ export async function GET(
     include: {
       creator: { select: { id: true, name: true } },
       designType: true,
-      abutmentExternalStability: true,
-      wingExternalStabilityLl: true,
-      wingExternalStability: true,
-      abutmentInternalStability: true,
-      wingInternalStability: true,
+      abutmentDesign: true,
+      wingDesign: true,
       panelFaceDesign: true,
     },
     orderBy: { createdAt: 'asc' },
@@ -67,15 +62,18 @@ export async function GET(
     return new NextResponse('No designs found for this project', { status: 400 });
   }
 
-  // Build DesignSection array
+  // Build DesignSection array. One merged design may emit multiple sections
+  // (abutment → external + internal, wing → external w/LL + external w/o LL + internal).
   const sections: DesignSection[] = [];
 
   for (const design of designs) {
     const typeKey = design.designType.key;
+    const designName = design.name;
+    const createdBy = design.creator.name;
 
-    if (typeKey === 'abutment_external_stability' && design.abutmentExternalStability) {
-      const d = design.abutmentExternalStability;
-      const p: ExternalStabilityParams = {
+    if (typeKey === 'abutment' && design.abutmentDesign) {
+      const d = design.abutmentDesign;
+      const extParams: ExternalStabilityParams = {
         yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, bI: d.bI,
         sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill,
         phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
@@ -86,9 +84,9 @@ export async function GET(
       sections.push({
         kind: 'external',
         designId: design.id,
-        designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
+        designTypeName: `${design.designType.name} — External Stability`,
+        designName,
+        createdBy,
         params: {
           'YEV': String(d.yev), 'YLS.V': String(d.ylsV),
           'βstem-Batter (deg)': String(d.bstemBatter), 'β(i) (deg)': String(d.bI),
@@ -99,72 +97,14 @@ export async function GET(
           'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
           'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
         },
-        rows: analyzeAbutmentExternal(p),
+        rows: analyzeAbutmentExternal(extParams),
       });
-    } else if (typeKey === 'wing_external_stability_ll' && design.wingExternalStabilityLl) {
-      const d = design.wingExternalStabilityLl;
-      const p: ExternalStabilityParams = {
-        yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, theta: d.theta, bI: d.bI,
-        sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill,
-        phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
-        pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
-        minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight,
-        sV: d.sV, minRl: safeMinRl,
-      };
-      sections.push({
-        kind: 'external',
-        designId: design.id,
-        designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
-        params: {
-          'YEV': String(d.yev), 'YLS.V': String(d.ylsV),
-          'βstem-Batter (deg)': String(d.bstemBatter), 'θ (deg)': String(d.theta),
-          'β(i) (deg)': String(d.bI), 'σ_brg (ksf)': String(d.sigmaBrg),
-          'δs': String(d.deltaS), 'γr.fill (pcf)': String(d.gRFill),
-          'φr.fill (deg)': String(d.phiRFill), 'φF.soil (deg)': String(d.phiFSoil),
-          'PGA': String(d.pga), 'F_PGA.EQ': String(d.fPgaEq), 'K_V': String(d.kV),
-          'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
-        },
-        rows: analyzeWingExternalLl(p),
-      });
-    } else if (typeKey === 'wing_external_stability' && design.wingExternalStability) {
-      const d = design.wingExternalStability;
-      const p: ExternalStabilityParams = {
-        yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, theta: d.theta, bI: d.bI,
-        sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill,
-        phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
-        pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
-        minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight,
-        sV: d.sV, minRl: safeMinRl,
-      };
-      sections.push({
-        kind: 'external',
-        designId: design.id,
-        designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
-        params: {
-          'YEV': String(d.yev), 'YLS.V': String(d.ylsV),
-          'βstem-Batter (deg)': String(d.bstemBatter), 'θ (deg)': String(d.theta),
-          'β(i) (deg)': String(d.bI), 'σ_brg (ksf)': String(d.sigmaBrg),
-          'δs': String(d.deltaS), 'γr.fill (pcf)': String(d.gRFill),
-          'φr.fill (deg)': String(d.phiRFill), 'φF.soil (deg)': String(d.phiFSoil),
-          'PGA': String(d.pga), 'F_PGA.EQ': String(d.fPgaEq), 'K_V': String(d.kV),
-          'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
-          'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
-        },
-        rows: analyzeWingExternalNoLl(p),
-      });
-    } else if (typeKey === 'abutment_internal_stability' && design.abutmentInternalStability) {
-      const d = design.abutmentInternalStability;
       sections.push({
         kind: 'internal',
         designId: design.id,
-        designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
+        designTypeName: `${design.designType.name} — Internal Stability`,
+        designName,
+        createdBy,
         params: {
           'βstem-Batter (deg)': String(d.bstemBatter), 'β(i) (deg)': String(d.bI),
           'δs': String(d.deltaS), 'γr.fill (pcf)': String(d.gRFill), 'φr.fill (deg)': String(d.phiRFill),
@@ -179,14 +119,47 @@ export async function GET(
         },
         rows: analyzeAbutmentInternal({ ...d, minRl: safeMinRl }),
       });
-    } else if (typeKey === 'wing_internal_stability' && design.wingInternalStability) {
-      const d = design.wingInternalStability;
+    } else if (typeKey === 'wing' && design.wingDesign) {
+      const d = design.wingDesign;
+      const extParams: ExternalStabilityParams = {
+        yev: d.yev, ylsV: d.ylsV, bstemBatter: d.bstemBatter, theta: d.theta, bI: d.bI,
+        sigmaBrg: d.sigmaBrg, deltaS: d.deltaS, gRFill: d.gRFill,
+        phiRFill: d.phiRFill, phiFSoil: d.phiFSoil,
+        pga: d.pga, fPgaEq: d.fPgaEq, kV: d.kV,
+        minDesignHeight: d.minDesignHeight, maxDesignHeight: d.maxDesignHeight,
+        sV: d.sV, minRl: safeMinRl,
+      };
+      const wingExtParamsMap = {
+        'YEV': String(d.yev), 'YLS.V': String(d.ylsV),
+        'βstem-Batter (deg)': String(d.bstemBatter), 'θ (deg)': String(d.theta),
+        'β(i) (deg)': String(d.bI), 'σ_brg (ksf)': String(d.sigmaBrg),
+        'δs': String(d.deltaS), 'γr.fill (pcf)': String(d.gRFill),
+        'φr.fill (deg)': String(d.phiRFill), 'φF.soil (deg)': String(d.phiFSoil),
+        'PGA': String(d.pga), 'F_PGA.EQ': String(d.fPgaEq), 'K_V': String(d.kV),
+        'Min Height (ft)': String(d.minDesignHeight), 'Max Height (ft)': String(d.maxDesignHeight),
+        'Sv (ft)': String(d.sV), 'Min RL (ft)': String(safeMinRl),
+      };
+      sections.push({
+        kind: 'external',
+        designId: design.id,
+        designTypeName: `${design.designType.name} — External Stability (with LL)`,
+        designName, createdBy,
+        params: wingExtParamsMap,
+        rows: analyzeWingExternalLl(extParams),
+      });
+      sections.push({
+        kind: 'external',
+        designId: design.id,
+        designTypeName: `${design.designType.name} — External Stability (without LL)`,
+        designName, createdBy,
+        params: wingExtParamsMap,
+        rows: analyzeWingExternalNoLl(extParams),
+      });
       sections.push({
         kind: 'internal',
         designId: design.id,
-        designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
+        designTypeName: `${design.designType.name} — Internal Stability`,
+        designName, createdBy,
         params: {
           'βstem-Batter (deg)': String(d.bstemBatter), 'β(i) (deg)': String(d.bI),
           'δs': String(d.deltaS), 'γr.fill (pcf)': String(d.gRFill), 'φr.fill (deg)': String(d.phiRFill),
@@ -203,14 +176,13 @@ export async function GET(
         },
         rows: analyzeWingInternal({ ...d, minRl: safeMinRl }),
       });
-    } else if (typeKey === 'panel_face_design' && design.panelFaceDesign) {
+    } else if (typeKey === 'panel_face' && design.panelFaceDesign) {
       const d = design.panelFaceDesign;
       sections.push({
         kind: 'panel_face',
         designId: design.id,
         designTypeName: design.designType.name,
-        designName: design.name,
-        createdBy: design.creator.name,
+        designName, createdBy,
         params: {
           "f'c (ksi)": String(d.fc), 'fy (ksi)': String(d.fy),
           'L panel (ft)': String(d.lPanel), 'h panel (ft)': String(d.hPanel),
@@ -234,7 +206,6 @@ export async function GET(
         },
       });
     }
-    // Designs with no recognized type or missing data are skipped
   }
 
   if (sections.length === 0) {
@@ -253,16 +224,6 @@ export async function GET(
   const safeName = project.name.replace(/[^a-z0-9]/gi, '_');
 
   try {
-    if (format === 'pdf') {
-      const buf = await generateProjectPdf(reportData);
-      return new NextResponse(new Uint8Array(buf), {
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${safeName}_report.pdf"`,
-        },
-      });
-    }
-
     const buf = await generateProjectDocx(reportData);
     return new NextResponse(new Uint8Array(buf), {
       headers: {

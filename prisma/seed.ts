@@ -17,33 +17,18 @@ async function main() {
   // ── Design Types ─────────────────────────────────────────────────────────
   const designTypes = [
     {
-      name: 'Abutment External Stability',
-      key: 'abutment_external_stability',
-      description: 'Check for external stability of an abutment.',
+      name: 'Abutment',
+      key: 'abutment',
+      description: 'MSE abutment wall — runs external and internal stability checks.',
     },
     {
-      name: 'Wing External Stability',
-      key: 'wing_external_stability',
-      description: 'Check for external stability of a wing (without LL).',
+      name: 'Wing',
+      key: 'wing',
+      description: 'MSE wing wall — runs external (with LL, without LL) and internal stability checks.',
     },
     {
-      name: 'Wing External Stability with LL',
-      key: 'wing_external_stability_ll',
-      description: 'Check for external stability of a wing (with LL).',
-    },
-    {
-      name: 'Abutment Internal Stability',
-      key: 'abutment_internal_stability',
-      description: 'Check for internal stability of an abutment.',
-    },
-    {
-      name: 'Wing Internal Stability',
-      key: 'wing_internal_stability',
-      description: 'Check for internal stability of a wing.',
-    },
-    {
-      name: 'Precast Panel Face Design',
-      key: 'panel_face_design',
+      name: 'Precast Panel Face',
+      key: 'panel_face',
       description: 'Flexure, shear, and crack control check for precast panel face.',
     },
   ];
