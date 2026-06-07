@@ -2,17 +2,10 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { db } from '@/lib/db';
 import { comparePassword } from '@/lib/auth/password';
+import { authConfig } from './auth.config';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  pages: {
-    signIn: '/login',
-    signOut: '/login',
-    error: '/login',
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: 'Credentials',
@@ -51,20 +44,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.image = user.image;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.image = token.image as string | null | undefined;
-      }
-      return session;
-    },
-  },
 });

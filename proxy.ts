@@ -1,34 +1,35 @@
-import { auth } from '@/auth';
+import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
+import { authConfig } from './auth.config';
+
+// Use edge-safe config (no Prisma/Node.js imports) so this runs on the Edge Runtime
+const { auth } = NextAuth(authConfig);
+
+const PUBLIC_PATHS = ['/login', '/register', '/about', '/forgot-password', '/reset-password', '/storage'];
 
 export default auth((req) => {
-  const token = req.auth;
   const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth;
 
-  const isPublicRoute =
-    pathname === '/' ||
-    pathname === '/about' ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/register') ||
-    pathname.startsWith('/forgot-password') ||
-    pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/storage/');
+  const isPublic = PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + '/'),
+  );
+  const isApiRoute = pathname.startsWith('/api/');
 
-  if (!token && !isPublicRoute) {
-    const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+  if (!isLoggedIn && !isPublic && !isApiRoute) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(url);
   }
 
-  if (token && (pathname === '/login' || pathname === '/register')) {
+  if (isLoggedIn && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
-
-  return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
