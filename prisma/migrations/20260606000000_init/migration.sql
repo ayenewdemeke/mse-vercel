@@ -17,8 +17,8 @@ CREATE TABLE "Project" (
     "userId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "location" TEXT NOT NULL,
-    "latitude" DOUBLE PRECISION NOT NULL,
-    "longitude" DOUBLE PRECISION NOT NULL,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
     "description" TEXT,
     "image" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -132,6 +132,7 @@ CREATE TABLE "AbutmentDesign" (
     "minDesignHeight" DOUBLE PRECISION NOT NULL,
     "maxDesignHeight" DOUBLE PRECISION NOT NULL,
     "sV" DOUBLE PRECISION NOT NULL,
+    "minRl" DOUBLE PRECISION NOT NULL DEFAULT 8,
 
     CONSTRAINT "AbutmentDesign_pkey" PRIMARY KEY ("id")
 );
@@ -182,6 +183,7 @@ CREATE TABLE "WingDesign" (
     "minDesignHeight" DOUBLE PRECISION NOT NULL,
     "maxDesignHeight" DOUBLE PRECISION NOT NULL,
     "sV" DOUBLE PRECISION NOT NULL,
+    "minRl" DOUBLE PRECISION NOT NULL DEFAULT 8,
 
     CONSTRAINT "WingDesign_pkey" PRIMARY KEY ("id")
 );
