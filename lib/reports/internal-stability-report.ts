@@ -13,68 +13,46 @@ import {
   WidthType,
 } from 'docx';
 import ExcelJS from 'exceljs';
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { LinearScale, PointElement, LineElement, Legend, Tooltip } from 'chart.js';
 import type { InternalStabilityRow } from '@/lib/calculations/internal-stability';
 
 const N = (v: number, d = 4) => (isFinite(v) ? v.toFixed(d) : '—');
 
 // ─── Server-side chart renderer ────────────────────────────────────────────────
 
-async function renderLtdsChartPng(rows: InternalStabilityRow[]): Promise<Buffer> {
-  const canvas = new ChartJSNodeCanvas({
-    width: 900,
-    height: 600,
-    backgroundColour: 'white',
-    chartCallback: (ChartJS) => {
-      ChartJS.register(LinearScale, PointElement, LineElement, Legend, Tooltip);
-    },
-  });
-
-  const zValues = rows.map((r) => r.z);
-  const make = (ltds: number[]) => ltds.map((v, i) => ({ x: v / 1000, y: zValues[i] }));
-  const maxZ = Math.max(...zValues);
-
-  const buf = await canvas.renderToBuffer({
-    type: 'scatter',
-    data: {
-      datasets: [
-        { label: 'Geostrip',      data: make(rows.map((r) => r.ltdsGeostrip)), borderColor: 'rgba(75,192,192,1)',  backgroundColor: 'rgba(75,192,192,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Geogrid',       data: make(rows.map((r) => r.ltdsGeogrid)), borderColor: 'rgba(255,99,132,1)',  backgroundColor: 'rgba(255,99,132,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Metallic Grid', data: make(rows.map((r) => r.ltdsSg)),      borderColor: 'rgba(54,162,235,1)',  backgroundColor: 'rgba(54,162,235,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Metallic Strip',data: make(rows.map((r) => r.ltdsSs)),      borderColor: 'rgba(153,102,255,1)', backgroundColor: 'rgba(153,102,255,1)', borderWidth: 2, pointRadius: 3, showLine: true },
-      ],
-    },
-    options: {
-      responsive: false,
-      parsing: false,
-      animation: false,
-      scales: {
-        x: {
-          type: 'linear',
-          position: 'bottom',
-          title: { display: true, text: 'Required Factored LTDS (kip/ft)' },
-          beginAtZero: true,
-          grid: { display: true, color: 'rgba(0,0,0,0.07)' },
-          ticks: { stepSize: 0.5 },
-        },
-        y: {
-          type: 'linear',
-          title: { display: true, text: 'Depth below finished grade, z (ft)' },
-          beginAtZero: true,
-          max: Math.ceil(maxZ + 1),
-          reverse: true,
-          grid: { display: true, color: 'rgba(0,0,0,0.07)' },
-          ticks: { stepSize: 1, callback: (v: number | string) => Number(v) % 5 === 0 ? String(v) : '' },
-        },
+async function renderLtdsChartPng(rows: InternalStabilityRow[]): Promise<Buffer | null> {
+  try {
+    const zValues = rows.map((r) => r.z);
+    const make = (ltds: number[]) => ltds.map((v, i) => ({ x: v / 1000, y: zValues[i] }));
+    const maxZ = Math.max(...zValues);
+    const chartConfig = {
+      type: 'scatter',
+      data: {
+        datasets: [
+          { label: 'Geostrip',      data: make(rows.map((r) => r.ltdsGeostrip)), borderColor: 'rgba(75,192,192,1)',  backgroundColor: 'rgba(75,192,192,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Geogrid',       data: make(rows.map((r) => r.ltdsGeogrid)),  borderColor: 'rgba(255,99,132,1)',  backgroundColor: 'rgba(255,99,132,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Metallic Grid', data: make(rows.map((r) => r.ltdsSg)),       borderColor: 'rgba(54,162,235,1)',  backgroundColor: 'rgba(54,162,235,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Metallic Strip',data: make(rows.map((r) => r.ltdsSs)),       borderColor: 'rgba(153,102,255,1)', backgroundColor: 'rgba(153,102,255,1)', borderWidth: 2, pointRadius: 3, showLine: true },
+        ],
       },
-      plugins: {
-        legend: { position: 'top' },
+      options: {
+        responsive: false, parsing: false, animation: false,
+        scales: {
+          x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Required Factored LTDS (kip/ft)' }, beginAtZero: true, grid: { display: true, color: 'rgba(0,0,0,0.07)' }, ticks: { stepSize: 0.5 } },
+          y: { type: 'linear', title: { display: true, text: 'Depth below finished grade, z (ft)' }, beginAtZero: true, max: Math.ceil(maxZ + 1), reverse: true, grid: { display: true, color: 'rgba(0,0,0,0.07)' } },
+        },
+        plugins: { legend: { position: 'top' } },
       },
-    },
-  });
-
-  return buf;
+    };
+    const res = await fetch('https://quickchart.io/chart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chart: chartConfig, width: 900, height: 600, backgroundColor: 'white' }),
+    });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 export interface InternalReportData {
@@ -188,13 +166,9 @@ export async function generateDocx(d: InternalReportData): Promise<Buffer> {
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { before: 120, after: 120 },
-          children: [
-            new ImageRun({
-              type: 'png',
-              data: chartPng,
-              transformation: { width: 620, height: 413 },
-            }),
-          ],
+          children: chartPng
+            ? [new ImageRun({ type: 'png', data: chartPng, transformation: { width: 620, height: 413 } })]
+            : [new TextRun({ text: '(Chart not available in this environment)', italics: true, color: '999999' })],
         }),
       ],
     }],
@@ -281,10 +255,12 @@ export async function generateXlsx(d: InternalReportData): Promise<Buffer> {
     rows.map((r) => [r.z, r.ltdsGeostrip, r.ltdsGeogrid, r.ltdsSg, r.ltdsSs, r.ltdsEeIGs, r.ltdsEeIGg, r.ltdsEeISg, r.ltdsEeISs]),
   );
 
-  const chartWs = wb.addWorksheet('Chart');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imageId = wb.addImage({ buffer: chartPng as any, extension: 'png' });
-  chartWs.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 900, height: 600 } });
+  if (chartPng) {
+    const chartWs = wb.addWorksheet('Chart');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const imageId = wb.addImage({ buffer: chartPng as any, extension: 'png' });
+    chartWs.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 900, height: 600 } });
+  }
 
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);

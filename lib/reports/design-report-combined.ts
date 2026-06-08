@@ -150,16 +150,10 @@ async function addInternalSheets(wb: ExcelJS.Workbook, prefix: string, rows: Int
 
 async function renderLtdsChart(rows: InternalStabilityRow[]): Promise<Buffer | null> {
   try {
-    const { ChartJSNodeCanvas } = await import('chartjs-node-canvas');
-    const { LinearScale, PointElement, LineElement, Legend, Tooltip } = await import('chart.js');
-    const canvas = new ChartJSNodeCanvas({
-      width: 900, height: 600, backgroundColour: 'white',
-      chartCallback: (C) => { C.register(LinearScale, PointElement, LineElement, Legend, Tooltip); },
-    });
     const zValues = rows.map((r) => r.z);
     const maxZ = Math.max(...zValues);
     const make = (ltds: number[]) => ltds.map((v, i) => ({ x: v / 1000, y: zValues[i] }));
-    return canvas.renderToBuffer({
+    const chartConfig = {
       type: 'scatter',
       data: {
         datasets: [
@@ -177,7 +171,14 @@ async function renderLtdsChart(rows: InternalStabilityRow[]): Promise<Buffer | n
         },
         plugins: { legend: { position: 'top' } },
       },
+    };
+    const res = await fetch('https://quickchart.io/chart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chart: chartConfig, width: 900, height: 600, backgroundColor: 'white' }),
     });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
   } catch {
     return null;
   }
