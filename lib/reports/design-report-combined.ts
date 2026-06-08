@@ -3,8 +3,6 @@ import {
   ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType,
 } from 'docx';
 import ExcelJS from 'exceljs';
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { LinearScale, PointElement, LineElement, Legend, Tooltip } from 'chart.js';
 import type { AnalysisRow } from '@/lib/calculations/external-stability';
 import type { InternalStabilityRow } from '@/lib/calculations/internal-stability';
 import type { PanelFaceResult } from '@/lib/calculations/panel-face';
@@ -142,39 +140,47 @@ async function addInternalSheets(wb: ExcelJS.Workbook, prefix: string, rows: Int
   );
 
   const chartPng = await renderLtdsChart(rows);
-  const chartWs = wb.addWorksheet(`${prefix}Chart`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imageId = wb.addImage({ buffer: chartPng as any, extension: 'png' });
-  chartWs.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 900, height: 600 } });
+  if (chartPng) {
+    const chartWs = wb.addWorksheet(`${prefix}Chart`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const imageId = wb.addImage({ buffer: chartPng as any, extension: 'png' });
+    chartWs.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 900, height: 600 } });
+  }
 }
 
-async function renderLtdsChart(rows: InternalStabilityRow[]): Promise<Buffer> {
-  const canvas = new ChartJSNodeCanvas({
-    width: 900, height: 600, backgroundColour: 'white',
-    chartCallback: (C) => { C.register(LinearScale, PointElement, LineElement, Legend, Tooltip); },
-  });
-  const zValues = rows.map((r) => r.z);
-  const maxZ = Math.max(...zValues);
-  const make = (ltds: number[]) => ltds.map((v, i) => ({ x: v / 1000, y: zValues[i] }));
-  return canvas.renderToBuffer({
-    type: 'scatter',
-    data: {
-      datasets: [
-        { label: 'Geostrip',       data: make(rows.map((r) => r.ltdsGeostrip)), borderColor: 'rgba(75,192,192,1)',  backgroundColor: 'rgba(75,192,192,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Geogrid',        data: make(rows.map((r) => r.ltdsGeogrid)),  borderColor: 'rgba(255,99,132,1)',  backgroundColor: 'rgba(255,99,132,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Metallic Grid',  data: make(rows.map((r) => r.ltdsSg)),       borderColor: 'rgba(54,162,235,1)',  backgroundColor: 'rgba(54,162,235,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
-        { label: 'Metallic Strip', data: make(rows.map((r) => r.ltdsSs)),       borderColor: 'rgba(153,102,255,1)', backgroundColor: 'rgba(153,102,255,1)', borderWidth: 2, pointRadius: 3, showLine: true },
-      ],
-    },
-    options: {
-      responsive: false, parsing: false, animation: false,
-      scales: {
-        x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Required Factored LTDS (kip/ft)' }, beginAtZero: true },
-        y: { type: 'linear', title: { display: true, text: 'Depth below finished grade, z (ft)' }, beginAtZero: true, max: Math.ceil(maxZ + 1), reverse: true },
+async function renderLtdsChart(rows: InternalStabilityRow[]): Promise<Buffer | null> {
+  try {
+    const { ChartJSNodeCanvas } = await import('chartjs-node-canvas');
+    const { LinearScale, PointElement, LineElement, Legend, Tooltip } = await import('chart.js');
+    const canvas = new ChartJSNodeCanvas({
+      width: 900, height: 600, backgroundColour: 'white',
+      chartCallback: (C) => { C.register(LinearScale, PointElement, LineElement, Legend, Tooltip); },
+    });
+    const zValues = rows.map((r) => r.z);
+    const maxZ = Math.max(...zValues);
+    const make = (ltds: number[]) => ltds.map((v, i) => ({ x: v / 1000, y: zValues[i] }));
+    return canvas.renderToBuffer({
+      type: 'scatter',
+      data: {
+        datasets: [
+          { label: 'Geostrip',       data: make(rows.map((r) => r.ltdsGeostrip)), borderColor: 'rgba(75,192,192,1)',  backgroundColor: 'rgba(75,192,192,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Geogrid',        data: make(rows.map((r) => r.ltdsGeogrid)),  borderColor: 'rgba(255,99,132,1)',  backgroundColor: 'rgba(255,99,132,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Metallic Grid',  data: make(rows.map((r) => r.ltdsSg)),       borderColor: 'rgba(54,162,235,1)',  backgroundColor: 'rgba(54,162,235,1)',  borderWidth: 2, pointRadius: 3, showLine: true },
+          { label: 'Metallic Strip', data: make(rows.map((r) => r.ltdsSs)),       borderColor: 'rgba(153,102,255,1)', backgroundColor: 'rgba(153,102,255,1)', borderWidth: 2, pointRadius: 3, showLine: true },
+        ],
       },
-      plugins: { legend: { position: 'top' } },
-    },
-  });
+      options: {
+        responsive: false, parsing: false, animation: false,
+        scales: {
+          x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Required Factored LTDS (kip/ft)' }, beginAtZero: true },
+          y: { type: 'linear', title: { display: true, text: 'Depth below finished grade, z (ft)' }, beginAtZero: true, max: Math.ceil(maxZ + 1), reverse: true },
+        },
+        plugins: { legend: { position: 'top' } },
+      },
+    });
+  } catch {
+    return null;
+  }
 }
 
 // ─── Word helpers ──────────────────────────────────────────────────────────────
@@ -296,11 +302,13 @@ async function internalDocxChildren(sectionTitle: string, rows: InternalStabilit
       rows.map((r) => [N(r.z, 2), N(r.ltdsGeostrip, 0), N(r.ltdsGeogrid, 0), N(r.ltdsSg, 0), N(r.ltdsSs, 0), N(r.ltdsEeIGs, 0), N(r.ltdsEeIGg, 0), N(r.ltdsEeISg, 0), N(r.ltdsEeISs, 0)]),
     ),
     wSection('Internal Stability — LTDS Chart'),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 120, after: 120 },
-      children: [new ImageRun({ type: 'png', data: chartPng, transformation: { width: 620, height: 413 } })],
-    }),
+    ...(chartPng
+      ? [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 120, after: 120 },
+          children: [new ImageRun({ type: 'png', data: chartPng, transformation: { width: 620, height: 413 } })],
+        })]
+      : [new Paragraph({ children: [new TextRun({ text: '(Chart not available in this environment)', italics: true, color: '999999' })] })]),
   ];
 }
 
